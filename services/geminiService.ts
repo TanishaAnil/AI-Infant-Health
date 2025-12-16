@@ -2,9 +2,19 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { LogEntry, LogType, InfantProfile } from "../types";
 import { REFERENCE_DOCS } from "./documents";
 
-// Initialize the client
-// Using gemini-2.5-flash for speed and efficiency.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize the client lazily
+let ai: GoogleGenAI | null = null;
+
+const getAi = () => {
+  if (!ai) {
+    // Accessing process.env.API_KEY here is safe because Vite replaces it at build time.
+    // We use a fallback empty string to prevent the constructor from throwing immediately if the key is missing,
+    // allowing the UI to load. The SDK will throw a specific error when a request is actually made.
+    const key = process.env.API_KEY || "";
+    ai = new GoogleGenAI({ apiKey: key });
+  }
+  return ai;
+};
 
 const getSystemInstruction = (profile: InfantProfile) => {
   const docList = REFERENCE_DOCS.map(d => `- ${d.title} (${d.url}): ${d.description}`).join('\n');
@@ -43,7 +53,7 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
     Respond in ${profile.language === 'te' ? 'Telugu' : 'English'}.
     `;
 
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response: GenerateContentResponse = await getAi().models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -55,7 +65,7 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
     return response.text || "I apologize, I could not generate a response.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Error connecting to AI service.";
+    return "Error connecting to AI service. Please check your API Key.";
   }
 };
 
@@ -64,7 +74,7 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
     const logSummary = logs.map(log => `[${log.timestamp.toLocaleTimeString()}] ${log.type}: ${JSON.stringify(log.details)}`).join('\n');
     const prompt = `Generate a 2-sentence summary of these logs for ${profile.name}. Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.`;
 
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: { systemInstruction: getSystemInstruction(profile) }
@@ -72,6 +82,7 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 
     return response.text || "";
   } catch (error) {
+    console.error("Summary Error:", error);
     return "";
   }
 }
@@ -104,7 +115,7 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
         Format: Markdown.
         `;
     
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
           model: 'gemini-2.5-flash',
           contents: prompt,
           config: { systemInstruction: getSystemInstruction(profile) }
