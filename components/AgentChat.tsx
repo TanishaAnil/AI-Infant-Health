@@ -50,25 +50,38 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     setInput('');
     setIsLoading(true);
 
+    // Create prompt history context
     const history = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
 
-    const responseText = await generateHealthInsight(logs, userMsg.text, profile, history);
+    try {
+        const responseText = await generateHealthInsight(logs, userMsg.text, profile, history);
 
-    const aiMsg: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'model',
-      text: responseText,
-      timestamp: new Date()
-    };
+        const aiMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'model',
+          text: responseText,
+          timestamp: new Date()
+        };
 
-    setMessages(prev => [...prev, aiMsg]);
-    setIsLoading(false);
+        setMessages(prev => [...prev, aiMsg]);
+    } catch (e) {
+        // Fallback error message if service throws completely
+        const errorMsg: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'model',
+            text: "System Error: Unable to reach AI service. Please check your connection and API key.",
+            timestamp: new Date()
+        };
+        setMessages(prev => [...prev, errorMsg]);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] bg-slate-50 rounded-2xl overflow-hidden shadow-inner border border-slate-200">
+    <div className="flex flex-col h-full bg-slate-50 rounded-2xl overflow-hidden shadow-inner border border-slate-200">
         
-        <div className="bg-indigo-50 px-4 py-2 flex items-center gap-2 border-b border-indigo-100">
+        <div className="bg-indigo-50 px-4 py-2 flex items-center gap-2 border-b border-indigo-100 shrink-0">
             <BookOpen size={14} className="text-indigo-600" />
             <span className="text-[10px] font-medium text-indigo-700">{t('kb_active', profile.language)}</span>
         </div>
@@ -114,7 +127,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 bg-white border-t border-slate-100">
+      <div className="p-4 bg-white border-t border-slate-100 shrink-0">
         <div className="flex items-center gap-2">
           <input
             type="text"

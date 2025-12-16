@@ -51,7 +51,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog 
   }
 
   return (
-    <div className="space-y-6 pb-20 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Header Profile */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
         <div className="flex items-center justify-between mb-3">

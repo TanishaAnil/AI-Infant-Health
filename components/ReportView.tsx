@@ -33,9 +33,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ logs, profile, chatHisto
   };
 
   return (
-    <div className="p-4 pb-20 animate-fade-in h-full flex flex-col">
+    <div className="p-4 h-full flex flex-col animate-fade-in">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 shrink-0">
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <FileText className="text-indigo-600" /> 
                 {t('report', profile.language)}

@@ -31,7 +31,7 @@ export const HealthCharts: React.FC<HealthChartsProps> = ({ logs }) => {
   const feedData = Array.from(feedDataMap.entries()).map(([date, amount]) => ({ date, amount })).reverse();
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6">
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
         <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <span className="w-2 h-6 bg-rose-400 rounded-full"></span>

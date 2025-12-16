@@ -60,51 +60,58 @@ const App: React.FC = () => {
 
   // 2. Main App (Conversation & Monitoring) & 3. Report Generation
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 sm:pb-0">
+    <div className="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
       
-      <div className="max-w-md mx-auto min-h-screen flex flex-col sm:border-x sm:border-slate-200 sm:bg-white sm:shadow-2xl">
+      <div className="max-w-md mx-auto w-full h-full flex flex-col sm:border-x sm:border-slate-200 sm:bg-white sm:shadow-2xl relative">
         
         {/* Desktop Header */}
-        <div className="hidden sm:flex items-center justify-between p-6 border-b border-slate-100">
+        <div className="hidden sm:flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-emerald-500 bg-clip-text text-transparent">NurtureAI</h1>
              <span className="text-xs font-semibold bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full uppercase">{profile.language}</span>
         </div>
 
-        {/* Dynamic Content */}
-        <main className="flex-1 p-4 overflow-y-auto">
+        {/* Dynamic Content - Flex-1 to fill available space, overflow-hidden to contain scroll */}
+        <main className="flex-1 overflow-hidden relative flex flex-col">
           
-          {view === 'dashboard' && dailyDigest && (
-            <div className="mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-200">
-                <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-white/20 p-1 rounded-lg"><Activity size={16} /></div>
-                    <h3 className="font-semibold text-sm">Agent Insight</h3>
-                </div>
-                <p className="text-xs leading-relaxed opacity-90">{dailyDigest}</p>
+          {/* Views that scroll internally or need full height */}
+          {view === 'dashboard' && (
+            <div className="flex-1 overflow-y-auto p-4 pb-24">
+                {dailyDigest && (
+                    <div className="mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-200 animate-fade-in">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="bg-white/20 p-1 rounded-lg"><Activity size={16} /></div>
+                            <h3 className="font-semibold text-sm">Agent Insight</h3>
+                        </div>
+                        <p className="text-xs leading-relaxed opacity-90">{dailyDigest}</p>
+                    </div>
+                )}
+                <Dashboard logs={logs} profile={profile} onQuickLog={handleQuickLog} />
             </div>
           )}
-
-          {view === 'dashboard' && (
-            <Dashboard logs={logs} profile={profile} onQuickLog={handleQuickLog} />
-          )}
+          
           {view === 'analysis' && (
-            <div className="animate-fade-in">
+            <div className="flex-1 overflow-y-auto p-4 pb-24 animate-fade-in">
                  <h2 className="text-xl font-bold mb-4 text-slate-800">{t('trends', profile.language)}</h2>
                 <HealthCharts logs={logs} />
             </div>
           )}
+          
           {view === 'logs' && (
-            <div className="animate-fade-in h-full">
-                <h2 className="text-xl font-bold mb-4 text-slate-800">{t('agent', profile.language)}</h2>
+            <div className="flex-1 overflow-hidden flex flex-col p-4 pb-24 animate-fade-in">
+                <h2 className="text-xl font-bold mb-4 text-slate-800 shrink-0">{t('agent', profile.language)}</h2>
                 <AgentChat logs={logs} profile={profile} onUpdateHistory={setChatHistory} />
             </div>
           )}
+          
           {view === 'report' && (
-            <ReportView logs={logs} profile={profile} chatHistory={chatHistory} />
+             <div className="flex-1 overflow-y-auto pb-24">
+                <ReportView logs={logs} profile={profile} chatHistory={chatHistory} />
+            </div>
           )}
         </main>
 
         {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 sm:absolute sm:bottom-0 bg-white border-t border-slate-200 p-2 z-50">
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2 z-50 shadow-lg">
             <div className="max-w-md mx-auto grid grid-cols-5 gap-1">
                 <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={20} />} label={t('dashboard', profile.language)} />
                 <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={<Activity size={20} />} label={t('trends', profile.language)} />

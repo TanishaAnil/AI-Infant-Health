@@ -53,7 +53,11 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
     Respond in ${profile.language === 'te' ? 'Telugu' : 'English'}.
     `;
 
-    const response: GenerateContentResponse = await getAi().models.generateContent({
+    // Ensure AI is initialized
+    const client = getAi();
+    if (!client) throw new Error("AI Client failed to initialize");
+
+    const response: GenerateContentResponse = await client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -62,10 +66,14 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
       }
     });
 
-    return response.text || "I apologize, I could not generate a response.";
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Error connecting to AI service. Please check your API Key.";
+    return response.text || "I apologize, I could not generate a response. Please try again.";
+  } catch (error: any) {
+    console.error("Gemini API Error details:", error);
+    // Provide a user-friendly error message that might help debug
+    if (error.message?.includes('API key')) {
+        return "Error: Invalid or missing API Key. Please check your .env file.";
+    }
+    return "I am having trouble connecting to the knowledge base right now. Please try again in a moment.";
   }
 };
 
@@ -74,7 +82,8 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
     const logSummary = logs.map(log => `[${log.timestamp.toLocaleTimeString()}] ${log.type}: ${JSON.stringify(log.details)}`).join('\n');
     const prompt = `Generate a 2-sentence summary of these logs for ${profile.name}. Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.`;
 
-    const response = await getAi().models.generateContent({
+    const client = getAi();
+    const response = await client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: { systemInstruction: getSystemInstruction(profile) }
@@ -115,7 +124,8 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
         Format: Markdown.
         `;
     
-        const response = await getAi().models.generateContent({
+        const client = getAi();
+        const response = await client.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: prompt,
           config: { systemInstruction: getSystemInstruction(profile) }
