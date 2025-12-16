@@ -7,9 +7,6 @@ let ai: GoogleGenAI | null = null;
 
 const getAi = () => {
   if (!ai) {
-    // Accessing process.env.API_KEY here is safe because Vite replaces it at build time.
-    // We use a fallback empty string to prevent the constructor from throwing immediately if the key is missing,
-    // allowing the UI to load. The SDK will throw a specific error when a request is actually made.
     const key = process.env.API_KEY || "";
     ai = new GoogleGenAI({ apiKey: key });
   }
@@ -17,22 +14,29 @@ const getAi = () => {
 };
 
 const getSystemInstruction = (profile: InfantProfile) => {
-  const docList = REFERENCE_DOCS.map(d => `- ${d.title} (${d.url}): ${d.description}`).join('\n');
+  const docList = REFERENCE_DOCS.map(d => `- ${d.title}: ${d.description}`).join('\n');
 
   return `
-You are NurtureAI, a specialized pediatric health assistant.
-User Profile:
-- Baby: ${profile.name}
-- Age Stage: ${profile.ageGroup}
-- Parent: ${profile.parentName}
-- Language Preference: ${profile.language === 'te' ? 'Telugu (తెలుగు)' : 'English'}
+You are NurtureAI, a warm, caring, and highly specialized pediatric health assistant.
+You are talking to ${profile.parentName}, the parent of ${profile.name} (${profile.ageGroup}).
 
-CORE DIRECTIVES:
-1. **Language**: If the preference is Telugu, YOU MUST REPLY IN TELUGU (using Telugu script). Provide English medical terms in parentheses if complex.
-2. **Knowledge Base**: You are an expert on the following documents. Use your internal knowledge of these specific texts to guide your advice:
+CORE PERSONA:
+1. **Friendly & Reassuring**: Always start with a warm tone. Parenting is hard; be supportive. (e.g., "That's a great question, ${profile.parentName}...", "It is completely normal to worry about...")
+2. **Evidence-Based**: You do not guess. You base your answers STRICTLY on general pediatric knowledge and the following specific documents:
 ${docList}
-3. **Citations**: When providing advice, mention which guideline you are referencing (e.g., "According to WHO guidelines..." or "AAP నిద్ర నియమాల ప్రకారం...").
-4. **Safety**: If high fever or dangerous symptoms are detected, warn the user immediately.
+3. **Citation**: When you give advice, explicitly mention the source document in a friendly way. (e.g., "The AAP Safe Sleep guidelines suggest...", "According to IMNCI protocols...").
+
+USER PROFILE:
+- Baby Name: ${profile.name}
+- Age: ${profile.ageGroup}
+- Language: ${profile.language === 'te' ? 'Telugu (తెలుగు)' : 'English'}
+
+INSTRUCTIONS:
+- If the user asks about fever or symptoms, check the provided Logs carefully.
+- If the temperature is above 38°C, prioritize medical attention in your response.
+- If the language is Telugu, write in Telugu script but keep medical terms (like 'Paracetamol', 'Fahrenheit') in English/Latin script for clarity if needed.
+- Keep responses concise (under 150 words) unless a detailed report is requested.
+- Use bold text (**text**) for key points to make it readable.
 `;
 };
 
@@ -43,14 +47,16 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
     }).join('\n');
 
     const prompt = `
-    CONTEXT:
+    CURRENT STATUS:
     Baby: ${profile.name} (${profile.ageGroup})
-    Logs: ${logSummary}
-    Chat History: ${chatHistory}
+    Recent Logs: ${logSummary}
     
-    USER QUERY: "${query}"
+    CONVERSATION HISTORY:
+    ${chatHistory}
     
-    Respond in ${profile.language === 'te' ? 'Telugu' : 'English'}.
+    PARENT QUERY: "${query}"
+    
+    Please provide a helpful, reassuring, and evidence-based response.
     `;
 
     // Ensure AI is initialized
@@ -62,25 +68,24 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
       contents: prompt,
       config: {
         systemInstruction: getSystemInstruction(profile),
-        temperature: 0.5, 
+        temperature: 0.7, // Slightly higher for warmth/creativity in phrasing
       }
     });
 
-    return response.text || "I apologize, I could not generate a response. Please try again.";
+    return response.text || "I apologize, I'm having trouble thinking of a response right now.";
   } catch (error: any) {
     console.error("Gemini API Error details:", error);
-    // Provide a user-friendly error message that might help debug
     if (error.message?.includes('API key')) {
-        return "Error: Invalid or missing API Key. Please check your .env file.";
+        return "It looks like my connection key is missing. Please check your settings.";
     }
-    return "I am having trouble connecting to the knowledge base right now. Please try again in a moment.";
+    return "I'm having a little trouble connecting to the medical database. Please try asking again in a moment.";
   }
 };
 
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
     const logSummary = logs.map(log => `[${log.timestamp.toLocaleTimeString()}] ${log.type}: ${JSON.stringify(log.details)}`).join('\n');
-    const prompt = `Generate a 2-sentence summary of these logs for ${profile.name}. Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.`;
+    const prompt = `Generate a very short, encouraging 2-sentence summary of these logs for ${profile.parentName}. Mention one positive thing. Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.`;
 
     const client = getAi();
     const response = await client.models.generateContent({
@@ -99,28 +104,14 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 export const generateFormalReport = async (logs: LogEntry[], profile: InfantProfile, chatHistory: string): Promise<string> => {
     try {
         const logSummary = logs.map(log => `[${log.timestamp.toLocaleString()}] ${log.type}: ${JSON.stringify(log.details)}`).join('\n');
-        const docNames = REFERENCE_DOCS.map(d => d.title).join(', ');
-
+        
         const prompt = `
         Generate a comprehensive "Infant Health Report" for downloading.
-        
         Patient: ${profile.name}
-        Age: ${profile.ageGroup}
-        Weight: ${profile.weight}kg
+        Data: ${logSummary}
+        Concerns: ${chatHistory}
         
-        Data:
-        ${logSummary}
-        
-        Recent Concerns (from chat):
-        ${chatHistory}
-        
-        Structure the report as follows:
-        1. Patient Vitals Summary
-        2. Feeding & Sleep Analysis
-        3. Recent Symptoms & Observations
-        4. AI Recommendations (Strictly aligned with ${docNames})
-        
-        Output Language: ${profile.language === 'te' ? 'Telugu (with English headers)' : 'English'}.
+        Output Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.
         Format: Markdown.
         `;
     

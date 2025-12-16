@@ -58,24 +58,24 @@ const App: React.FC = () => {
     return <Login onLogin={handleLogin} />;
   }
 
-  // 2. Main App (Conversation & Monitoring) & 3. Report Generation
+  // 2. Main App (Conversation & Monitoring)
   return (
     <div className="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
       
-      <div className="max-w-md mx-auto w-full h-full flex flex-col sm:border-x sm:border-slate-200 sm:bg-white sm:shadow-2xl relative">
+      {/* Main Container */}
+      <div className="max-w-md mx-auto w-full h-full flex flex-col sm:border-x sm:border-slate-200 sm:bg-white sm:shadow-2xl">
         
         {/* Desktop Header */}
-        <div className="hidden sm:flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
+        <div className="hidden sm:flex items-center justify-between p-6 border-b border-slate-100 shrink-0 bg-white z-10">
              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-emerald-500 bg-clip-text text-transparent">NurtureAI</h1>
              <span className="text-xs font-semibold bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full uppercase">{profile.language}</span>
         </div>
 
-        {/* Dynamic Content - Flex-1 to fill available space, overflow-hidden to contain scroll */}
-        <main className="flex-1 overflow-hidden relative flex flex-col">
+        {/* Dynamic Content - Flex-1 means it takes all remaining height. Overflow-hidden handles internal scrolling */}
+        <main className="flex-1 overflow-hidden relative flex flex-col bg-slate-50/50">
           
-          {/* Views that scroll internally or need full height */}
           {view === 'dashboard' && (
-            <div className="flex-1 overflow-y-auto p-4 pb-24">
+            <div className="flex-1 overflow-y-auto p-4 pb-4">
                 {dailyDigest && (
                     <div className="mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-200 animate-fade-in">
                         <div className="flex items-center gap-2 mb-2">
@@ -90,39 +90,38 @@ const App: React.FC = () => {
           )}
           
           {view === 'analysis' && (
-            <div className="flex-1 overflow-y-auto p-4 pb-24 animate-fade-in">
+            <div className="flex-1 overflow-y-auto p-4 pb-4 animate-fade-in">
                  <h2 className="text-xl font-bold mb-4 text-slate-800">{t('trends', profile.language)}</h2>
                 <HealthCharts logs={logs} />
             </div>
           )}
           
           {view === 'logs' && (
-            <div className="flex-1 overflow-hidden flex flex-col p-4 pb-24 animate-fade-in">
-                <h2 className="text-xl font-bold mb-4 text-slate-800 shrink-0">{t('agent', profile.language)}</h2>
+            <div className="flex-1 overflow-hidden flex flex-col animate-fade-in h-full">
                 <AgentChat logs={logs} profile={profile} onUpdateHistory={setChatHistory} />
             </div>
           )}
           
           {view === 'report' && (
-             <div className="flex-1 overflow-y-auto pb-24">
+             <div className="flex-1 overflow-y-auto pb-4">
                 <ReportView logs={logs} profile={profile} chatHistory={chatHistory} />
             </div>
           )}
         </main>
 
-        {/* Bottom Navigation */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2 z-50 shadow-lg">
-            <div className="max-w-md mx-auto grid grid-cols-5 gap-1">
+        {/* Bottom Navigation - Static Footer (Shrink-0) - No overlapping! */}
+        <div className="shrink-0 bg-white border-t border-slate-200 p-2 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="grid grid-cols-5 gap-1 relative">
                 <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={20} />} label={t('dashboard', profile.language)} />
                 <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={<Activity size={20} />} label={t('trends', profile.language)} />
                 
-                {/* Center FAB */}
-                <div className="relative -top-6 flex justify-center">
+                {/* Center FAB - Floats strictly up from the footer, ensuring it never gets 'lost' */}
+                <div className="relative -top-6 flex justify-center pointer-events-none">
                     <button 
                         onClick={() => handleQuickLog(LogType.FEEDING)} 
-                        className="w-12 h-12 bg-indigo-600 rounded-full shadow-lg shadow-indigo-300 flex items-center justify-center text-white active:scale-95 transition-transform"
+                        className="pointer-events-auto w-14 h-14 bg-indigo-600 rounded-full shadow-lg shadow-indigo-300 flex items-center justify-center text-white active:scale-95 transition-transform border-4 border-slate-50"
                     >
-                        <PlusCircle size={24} />
+                        <PlusCircle size={28} />
                     </button>
                 </div>
 
@@ -146,10 +145,10 @@ const App: React.FC = () => {
 const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
     <button 
         onClick={onClick}
-        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-colors ${active ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-colors ${active ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
     >
         {icon}
-        <span className="text-[9px] font-medium mt-1 truncate max-w-full">{label}</span>
+        <span className="text-[10px] font-medium mt-1 truncate max-w-full">{label}</span>
     </button>
 );
 
