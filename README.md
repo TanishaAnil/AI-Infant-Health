@@ -2,35 +2,30 @@
 
 An intelligent, agentic health monitoring interface for infants that tracks vitals, sleep, and feeding, providing real-time AI insights and pediatric guidance using the Gemini API.
 
-## Setup Instructions
+## 🚀 Quick Setup (VS Code)
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <your-repo-url>
-    cd nurture-ai
-    ```
-
-2.  **Install dependencies:**
+1.  **Install Dependencies:** (Fixes 'vite is not recognized' error)
     ```bash
     npm install
     ```
 
-3.  **Configure Environment Variables:**
-    *   Create a file named `.env` in the root directory.
-    *   Add your Google Gemini API Key:
-        ```env
-        API_KEY=your_actual_api_key_here
-        ```
-    *   *Note: Never commit `.env` to GitHub.*
+2.  **Configure API Key:**
+    *   Create a file named `.env` in the root folder.
+    *   Add your key: `API_KEY=AIzaSy...`
 
-4.  **Run the application:**
+3.  **Run Locally:**
     ```bash
     npm run dev
     ```
+    Open the link shown in the terminal (usually `http://localhost:5173`).
 
-## Tech Stack
+## 🛠️ Tech Stack
 *   React 18 + Vite
 *   TailwindCSS
-*   Google GenAI SDK
+*   Google GenAI SDK (Gemini 2.5 Flash)
 *   Lucide React (Icons)
 *   Recharts (Data Visualization)
+
+## ⚠️ Troubleshooting
+*   **'vite' is not recognized:** You skipped step 1. Run `npm install`.
+*   **API Key Error:** Ensure your `.env` file is named exactly `.env` and is in the root directory (not inside `src` or `components`).
