@@ -6,8 +6,10 @@ import { REFERENCE_DOCS } from "./documents";
 let ai: GoogleGenAI | null = null;
 
 const getAi = () => {
+  const key = process.env.API_KEY;
+  if (!key) return null; // Return null if no key, handled in caller
+  
   if (!ai) {
-    const key = process.env.API_KEY || "";
     ai = new GoogleGenAI({ apiKey: key });
   }
   return ai;
@@ -67,6 +69,11 @@ Patient Details:
 
 export const generateHealthInsight = async (logs: LogEntry[], query: string, profile: InfantProfile, chatHistory: string): Promise<string> => {
   try {
+    const key = process.env.API_KEY;
+    if (!key) {
+        return "⚠️ **Configuration Error: API Key Missing**\n\nTo use the AI Doctor features, you must configure your API Key.\n\n1. Create a file named `.env` in the root folder of your project.\n2. Add this line: `API_KEY=your_google_gemini_key_here`\n3. Restart the application terminal.\n\n*Note: This is a local environment setup requirement.*";
+    }
+
     const logSummary = logs.slice(0, 20).map(log => {
       return `[${log.timestamp.toLocaleString()}] ${log.type}: ${JSON.stringify(log.details)}`;
     }).join('\n');
@@ -121,7 +128,7 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
   } catch (error: any) {
     console.error("Gemini API Error details:", error);
     if (error.message?.includes('API key')) {
-        return "System Alert: Medical Database Connection Failed (API Key missing).";
+        return "System Alert: Medical Database Connection Failed (API Key missing or invalid).";
     }
     return "I am having trouble accessing the medical protocols. Please consult a physical doctor immediately if the situation is urgent.";
   }
@@ -129,10 +136,15 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
 
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
+    const key = process.env.API_KEY;
+    if (!key) return "";
+
     const logSummary = logs.map(log => `[${log.timestamp.toLocaleTimeString()}] ${log.type}: ${JSON.stringify(log.details)}`).join('\n');
     const prompt = `Generate a 2-sentence 'Morning Rounds' summary for ${profile.parentName} about ${profile.name}. Mention trends. Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.`;
 
     const client = getAi();
+    if (!client) return "";
+
     const response = await client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
@@ -148,6 +160,9 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 
 export const generateFormalReport = async (logs: LogEntry[], profile: InfantProfile, chatHistory: string): Promise<string> => {
     try {
+        const key = process.env.API_KEY;
+        if (!key) return "Error: API Key missing. Please configure .env file.";
+
         const logSummary = logs.map(log => `[${log.timestamp.toLocaleString()}] ${log.type}: ${JSON.stringify(log.details)}`).join('\n');
         
         const prompt = `
@@ -161,6 +176,8 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
         `;
     
         const client = getAi();
+        if (!client) return "AI Client Initialization Failed.";
+
         const response = await client.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: prompt,
