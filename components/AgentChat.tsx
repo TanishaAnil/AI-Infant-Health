@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, BookOpen, ChevronRight } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Stethoscope, ChevronRight, Link2, Mic, MicOff } from 'lucide-react';
 import { ChatMessage, LogEntry, InfantProfile } from '../types';
 import { generateHealthInsight } from '../services/geminiService';
 import { t } from '../utils/translations';
@@ -10,21 +10,56 @@ interface AgentChatProps {
   onUpdateHistory: (msgs: ChatMessage[]) => void;
 }
 
-// Simple formatter for Bold text (**text**) and newlines to avoid heavy markdown libraries
+// Improved formatter for Doctor's Notes (Handling Bold, Lists, Links)
 const formatText = (text: string) => {
-  return text.split('\n').map((line, i) => (
-    <React.Fragment key={i}>
-      {line.split(/(\*\*.*?\*\*)/).map((part, j) => 
+  const lines = text.split('\n');
+  return lines.map((line, i) => {
+    // Handle bullet points
+    if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+       return (
+         <li key={i} className="ml-4 list-disc marker:text-indigo-400 pl-1">
+            {parseInlineStyles(line.replace(/^[*-]\s/, ''))}
+         </li>
+       );
+    }
+    // Handle numbered lists
+    if (/^\d+\./.test(line.trim())) {
+        return (
+            <div key={i} className="ml-2 font-medium text-slate-800 mt-1">
+                {parseInlineStyles(line)}
+            </div>
+        )
+    }
+    // Handle Source Links (Markdown style [Title](url))
+    if (line.includes('[') && line.includes('](')) {
+        const parts = line.split(/(\[.*?\]\(.*?\))/g);
+        return (
+            <div key={i} className="text-xs text-indigo-600 flex items-center gap-1 mt-1">
+                <Link2 size={12} />
+                {parts.map((part, j) => {
+                    const match = part.match(/\[(.*?)\]\((.*?)\)/);
+                    if (match) {
+                        return <a key={j} href={match[2]} target="_blank" rel="noopener noreferrer" className="underline hover:text-indigo-800">{match[1]}</a>
+                    }
+                    return <span key={j}>{part}</span>;
+                })}
+            </div>
+        )
+    }
+    
+    return <p key={i} className="min-h-[1rem]">{parseInlineStyles(line)}</p>;
+  });
+};
+
+const parseInlineStyles = (text: string) => {
+    return text.split(/(\*\*.*?\*\*)/).map((part, j) => 
         part.startsWith('**') && part.endsWith('**') ? (
-          <strong key={j} className="font-bold text-indigo-900">{part.slice(2, -2)}</strong>
+          <strong key={j} className="font-bold text-slate-900">{part.slice(2, -2)}</strong>
         ) : (
           part
         )
-      )}
-      <br />
-    </React.Fragment>
-  ));
-};
+      );
+}
 
 export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHistory }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -32,18 +67,20 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
       id: 'welcome',
       role: 'model',
       text: profile.language === 'te' 
-        ? `నమస్కారం ${profile.parentName}! నేను NurtureAI. ${profile.name} ఆరోగ్యం గురించి మీరు నన్ను ఏమైనా అడగవచ్చు. ఈ రోజు నేను మీకు ఎలా సహాయపడగలను?`
-        : `Hi ${profile.parentName}! I'm NurtureAI. I've reviewed ${profile.name}'s recent logs. How can I support you today?`,
+        ? `నమస్కారం ${profile.parentName}. నేను డాక్టర్ NurtureAI (పీడియాట్రిక్ కన్సల్టెంట్). ${profile.name} ఆరోగ్యం గురించి చెప్పండి. ఏవైనా లక్షణాలు ఉన్నాయా?`
+        : `Hello ${profile.parentName}. I am Dr. NurtureAI, your Pediatric Health Consultant. I have access to ${profile.name}'s logs and medical guidelines. \n\nWhat symptoms are you observing today?`,
       timestamp: new Date()
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   const suggestions = profile.language === 'te' 
-    ? ["పాప బరువు సరిగ్గా ఉందా?", "నిద్ర వేళలు ఎలా ఉన్నాయి?", "జ్వరం ఉంటే ఏం చేయాలి?"]
-    : ["Is the weight normal?", "Analyze sleep pattern", "Signs of dehydration?", "Feeding schedule advice"];
+    ? ["జ్వరం వచ్చింది", "ఆహారం తీసుకోవట్లేదు", "దగ్గు/జలుబు ఉంది"]
+    : ["Baby has a fever", "Not eating well", "Crying uncontrollably", "Skin rash advice"];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,6 +88,45 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
 
   useEffect(scrollToBottom, [messages, isLoading]);
   useEffect(() => { onUpdateHistory(messages); }, [messages, onUpdateHistory]);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = profile.language === 'te' ? 'te-IN' : 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput((prev) => prev ? `${prev} ${transcript}` : transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
 
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
@@ -67,7 +143,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     setInput('');
     setIsLoading(true);
 
-    const history = messages.slice(-6).map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
+    // Send recent context
+    const history = messages.slice(-8).map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
 
     try {
         const responseText = await generateHealthInsight(logs, userMsg.text, profile, history);
@@ -84,7 +161,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         const errorMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
             role: 'model',
-            text: "System Error: Unable to reach AI service. Please check your connection and API key.",
+            text: "Network Error: Unable to reach the medical service. Please check your connection.",
             timestamp: new Date()
         };
         setMessages(prev => [...prev, errorMsg]);
@@ -96,20 +173,11 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
   return (
     <div className="flex flex-col h-full bg-slate-50">
         
-      {/* KB Indicator */}
-      <div className="bg-white/80 backdrop-blur px-4 py-2 flex items-center justify-between border-b border-slate-100 shrink-0 sticky top-0 z-10">
-          <div className="flex items-center gap-2">
-            <BookOpen size={14} className="text-emerald-600" />
-            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">{t('kb_active', profile.language)}</span>
-          </div>
-          <span className="text-[10px] text-slate-400">Gemini 2.5 Flash</span>
-      </div>
-
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-            <div className={`flex max-w-[90%] md:max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-end gap-2`}>
+            <div className={`flex max-w-[95%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-end gap-2`}>
                 
                 {/* Avatar */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-emerald-600 border border-emerald-100'}`}>
@@ -118,7 +186,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
 
                 {/* Bubble */}
                 <div
-                    className={`p-3.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                    className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
                     msg.role === 'user'
                         ? 'bg-indigo-600 text-white rounded-br-none'
                         : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none'
@@ -138,7 +206,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                          <Sparkles size={14} className="text-emerald-500 animate-pulse" />
                     </div>
                     <div className="p-3 rounded-2xl bg-white border border-slate-100 rounded-bl-none flex items-center gap-3">
-                         <span className="text-xs text-slate-400 font-medium">Consulting guidelines...</span>
+                         <span className="text-xs text-slate-500 font-medium">Dr. Nurture is analyzing symptoms & guidelines...</span>
                          <div className="flex space-x-1">
                             <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                             <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -170,12 +238,28 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         )}
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleListening}
+            className={`p-3.5 rounded-xl transition-all shadow-sm ${
+                isListening 
+                ? 'bg-red-50 text-red-500 border border-red-200 animate-pulse' 
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
+            }`}
+            title="Speak symptoms (Voice Input)"
+          >
+            {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+          </button>
+
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={profile.language === 'te' ? 'ఇక్కడ టైప్ చేయండి...' : "Ask NurtureAI..."}
+            placeholder={
+                isListening 
+                ? (profile.language === 'te' ? 'వినబడుతోంది...' : 'Listening...') 
+                : (profile.language === 'te' ? 'లక్షణాలు టైప్ చేయండి...' : "Describe symptoms...")
+            }
             className="flex-1 p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all"
           />
           <button
