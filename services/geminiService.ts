@@ -6,8 +6,9 @@ import { REFERENCE_DOCS } from "./documents";
 let ai: GoogleGenAI | null = null;
 
 const getAi = () => {
+  // Access the key which is polyfilled by vite.config.ts from .env or system env
   const key = process.env.API_KEY;
-  if (!key) return null; // Return null if no key, handled in caller
+  if (!key) return null; 
   
   if (!ai) {
     ai = new GoogleGenAI({ apiKey: key });
@@ -28,37 +29,30 @@ Patient Details:
 
 ### CONSULTATION PROTOCOL (STRICT ORDER):
 
-1.  **STEP 1: TRIAGE & DIFFERENTIAL VERIFICATION (The "Investigation"):**
+1.  **STEP 1: TRIAGE & DIFFERENTIAL VERIFICATION:**
     *   **Do NOT prescribe immediately** if the symptom is new or vague.
-    *   **Verify Related Diseases:** If user says "Fever", you MUST ask about related severe symptoms to differentiate common viral fever from serious infections (Meningitis, Dengue, Pneumonia).
-        *   *Ask:* "Is there any rash?", "Any neck stiffness?", "Is breathing fast?", "Any vomiting?".
-    *   *If user says "Cough/Cold":* Ask about "Chest indrawing" or "Fast breathing" (Pneumonia checks).
-    *   *If user says "Diarrhea":* Ask about "Blood in stool", "Thirst", "Activity level" (Dehydration checks).
+    *   **Verify Related Diseases:** If user says "Fever", you MUST ask about related severe symptoms (Rash, Neck Stiffness, Fast Breathing).
+    *   *If user says "Cough/Cold":* Ask about "Chest indrawing" or "Fast breathing".
+    *   *If user says "Diarrhea":* Ask about "Blood in stool", "Thirst".
 
 2.  **STEP 2: DIAGNOSIS & EXPLANATION:**
-    *   Based on provided logs/answers, state the **Working Diagnosis**.
-    *   Reference the **Internal Documents** where applicable (e.g., "According to IMNCI guidelines for fever...").
+    *   State the **Working Diagnosis**.
+    *   Reference the **Internal Documents** where applicable.
 
 3.  **STEP 3: COMPREHENSIVE CARE PLAN:**
     *   **A. DIET & FLUID PLAN (Mandatory):**
-        *   Provide a specific feeding schedule suitable for **${profile.ageGroup}**.
-        *   *0-6 Months:* "Exclusive Breastfeeding. Feed more frequently (every 2 hours) to prevent dehydration."
-        *   *6+ Months:* Suggest specific soft foods (e.g., "Mashed dal/rice," "Stewed apple").
-        *   *Fluids:* Specify ORS volume if dehydration is suspected.
-    *   **B. HOME CARE:**
-        *   Environmental advice (Clothing, Room temp).
-        *   Hygiene advice.
-    *   **C. MEDICINES:**
-        *   Suggest OTC meds (Paracetamol, Zinc, Saline drops) ONLY if relevant.
-        *   **Calculated Dosage:** You MUST estimate dosage based on **${profile.weight}kg** (e.g., "Paracetamol ~15mg/kg per dose").
+        *   *0-6 Months:* Exclusive Breastfeeding. Feed frequently.
+        *   *6+ Months:* Soft foods + Breastfeeding.
+        *   *Fluids:* ORS volume if dehydration is suspected.
+    *   **B. MEDICINES:**
+        *   Suggest OTC meds (Paracetamol, Zinc) ONLY if relevant.
+        *   **Calculated Dosage:** Estimate dosage based on **${profile.weight}kg**.
         *   *WARNING:* "Always verify exact dose with the pharmacist."
 
 4.  **STEP 4: FOLLOW-UP & RED FLAGS:**
-    *   **When to Return:** "Bring the child back immediately if: [List Danger Signs like 'Not able to drink', 'Vomiting everything', 'Convulsions']."
-    *   **Routine Follow-up:** "If no improvement in 2 days, visit the clinic."
+    *   **When to Return:** "Bring the child back immediately if: [Danger Signs]."
 
 5.  **INTERNAL REFERENCE DOCS:**
-    Use these guidelines to form your answers:
     ${docList}
 
 ### RESPONSE FORMAT:
@@ -71,7 +65,7 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
   try {
     const key = process.env.API_KEY;
     if (!key) {
-        return "⚠️ **Configuration Error: API Key Missing**\n\nTo use the AI Doctor features, you must configure your API Key.\n\n1. Create a file named `.env` in the root folder of your project.\n2. Add this line: `API_KEY=your_google_gemini_key_here`\n3. Restart the application terminal.\n\n*Note: This is a local environment setup requirement.*";
+        return "⚠️ **Configuration Error: API Key Missing**\n\nTo use the AI Doctor features, you must configure your API Key.\n\n1. Create a file named `.env` in the root folder.\n2. Add `API_KEY=your_key_here`\n3. Restart the terminal.";
     }
 
     const logSummary = logs.slice(0, 20).map(log => {
@@ -88,13 +82,11 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
     PARENT QUERY: "${query}"
     
     INSTRUCTIONS:
-    1. If this is a new symptom, ask Rule-Out questions to verify it's not a serious related disease.
-    2. Refer to the manual documents (IMNCI/AAP) in your training context.
-    3. Give a Diet Plan suitable for a child weighing ${profile.weight}kg.
-    4. Tell them exactly when to visit the doctor again.
+    1. If this is a new symptom, ask Rule-Out questions.
+    2. Give a Diet Plan suitable for ${profile.weight}kg.
+    3. Tell them exactly when to visit the doctor.
     `;
 
-    // Ensure AI is initialized
     const client = getAi();
     if (!client) throw new Error("AI Client failed to initialize");
 
@@ -103,14 +95,13 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
       contents: prompt,
       config: {
         systemInstruction: getSystemInstruction(profile),
-        temperature: 0.3, // Low temp for medical accuracy
+        temperature: 0.3,
         tools: [{ googleSearch: {} }],
       }
     });
 
     let finalText = response.text || "I apologize, I cannot provide a consultation right now.";
 
-    // Append Google Search Sources if available
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     if (groundingChunks && groundingChunks.length > 0) {
       const sources = groundingChunks
@@ -128,7 +119,7 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
   } catch (error: any) {
     console.error("Gemini API Error details:", error);
     if (error.message?.includes('API key')) {
-        return "System Alert: Medical Database Connection Failed (API Key missing or invalid).";
+        return "System Alert: Medical Database Connection Failed (API Key missing or invalid). Please check your .env file.";
     }
     return "I am having trouble accessing the medical protocols. Please consult a physical doctor immediately if the situation is urgent.";
   }

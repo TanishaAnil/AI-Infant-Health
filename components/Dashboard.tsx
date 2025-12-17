@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { LogEntry, LogType, InfantProfile, AgeGroup } from '../types';
-import { Clock, Thermometer, Droplets, Moon, AlertTriangle, Baby, Utensils, Tag } from 'lucide-react';
+import { Clock, Thermometer, Droplets, Moon, AlertTriangle, Baby, Utensils, Tag, ChevronRight } from 'lucide-react';
 import { t } from '../utils/translations';
 
 interface DashboardProps {
@@ -53,25 +53,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header Profile */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+                <div className="w-12 h-12 bg-gradient-to-br from-indigo-100 to-white border border-indigo-50 rounded-full flex items-center justify-center text-indigo-600 shadow-sm">
                     <Baby size={24} />
                 </div>
                 <div>
                     <h2 className="font-bold text-slate-800 text-lg">{profile.name}</h2>
-                    <p className="text-xs text-slate-500">{(new Date().getTime() - profile.birthDate.getTime()) / (1000 * 60 * 60 * 24 * 7) | 0} weeks old</p>
+                    <p className="text-xs text-slate-500 font-medium">{(new Date().getTime() - profile.birthDate.getTime()) / (1000 * 60 * 60 * 24 * 7) | 0} weeks old</p>
                 </div>
             </div>
             <div className="text-right">
-                <p className="text-xs text-slate-400">{t('weight', lang)}</p>
-                <p className="font-semibold text-slate-700">{profile.weight} kg</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('weight', lang)}</p>
+                <p className="font-bold text-slate-700 text-lg">{profile.weight} <span className="text-xs text-slate-400">kg</span></p>
             </div>
         </div>
         
         {/* Age Badge */}
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold w-fit ${getAgeGroupColor(profile.ageGroup)}`}>
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold w-fit ${getAgeGroupColor(profile.ageGroup)}`}>
             <Tag size={12} />
             <span>{profile.ageGroup}</span>
         </div>
@@ -79,12 +79,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog 
 
       {/* Critical Alert */}
       {isFever && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex items-start space-x-3">
-          <AlertTriangle className="text-red-500 shrink-0" />
+        <div className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-start space-x-3 shadow-sm">
+          <div className="bg-red-100 p-2 rounded-full text-red-500">
+              <AlertTriangle size={20} />
+          </div>
           <div>
             <h3 className="font-bold text-red-700 text-sm">High Temperature</h3>
-            <p className="text-xs text-red-600 mt-1">
-              {stats.lastTemp?.details.temperature}°C. Monitor closely.
+            <p className="text-xs text-red-600 mt-1 leading-relaxed">
+              Recorded <strong>{stats.lastTemp?.details.temperature}°C</strong>. Please monitor closely and consult the AI Agent.
             </p>
           </div>
         </div>
@@ -93,96 +95,101 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
         {/* Feeding */}
-        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div className="p-2 bg-white rounded-lg shadow-sm text-blue-500"><Utensils size={18} /></div>
-            <span className="text-xs font-medium text-blue-400">{t('feed', lang)}</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 bg-blue-50 rounded-xl text-blue-500"><Utensils size={18} /></div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase">{t('feed', lang)}</span>
           </div>
-          <div className="mt-3">
-            <p className="text-lg font-bold text-slate-700">{getTimeAgo(stats.lastFeed?.timestamp)}</p>
-            <p className="text-xs text-slate-500">{stats.lastFeed?.details.amount ? `${stats.lastFeed.details.amount}oz` : 'Breastfeed'}</p>
+          <div>
+            <p className="text-xl font-bold text-slate-700">{getTimeAgo(stats.lastFeed?.timestamp)}</p>
+            <p className="text-xs text-slate-500 font-medium">{stats.lastFeed?.details.amount ? `${stats.lastFeed.details.amount}oz` : 'Breastfeed'}</p>
           </div>
         </div>
 
         {/* Sleep */}
-        <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-500"><Moon size={18} /></div>
-            <span className="text-xs font-medium text-indigo-400">{t('sleep', lang)}</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-500"><Moon size={18} /></div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase">{t('sleep', lang)}</span>
           </div>
-          <div className="mt-3">
-            <p className="text-lg font-bold text-slate-700">{(stats.totalSleepMinutes / 60).toFixed(1)} hrs</p>
-            <p className="text-xs text-slate-500">Last: {getTimeAgo(stats.lastSleep?.timestamp)}</p>
+          <div>
+            <p className="text-xl font-bold text-slate-700">{(stats.totalSleepMinutes / 60).toFixed(1)} <span className="text-sm font-normal text-slate-400">hrs</span></p>
+            <p className="text-xs text-slate-500 font-medium">Last: {getTimeAgo(stats.lastSleep?.timestamp)}</p>
           </div>
         </div>
 
         {/* Diaper */}
-        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div className="p-2 bg-white rounded-lg shadow-sm text-emerald-500"><Droplets size={18} /></div>
-            <span className="text-xs font-medium text-emerald-400">{t('diaper', lang)}</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-500"><Droplets size={18} /></div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase">{t('diaper', lang)}</span>
           </div>
-          <div className="mt-3">
-            <p className="text-lg font-bold text-slate-700">{getTimeAgo(stats.lastDiaper?.timestamp)}</p>
-            <p className="text-xs text-slate-500 capitalize">{stats.lastDiaper?.details.contents || 'N/A'}</p>
+          <div>
+            <p className="text-xl font-bold text-slate-700">{getTimeAgo(stats.lastDiaper?.timestamp)}</p>
+            <p className="text-xs text-slate-500 font-medium capitalize">{stats.lastDiaper?.details.contents || 'N/A'}</p>
           </div>
         </div>
 
         {/* Temp */}
-        <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div className="p-2 bg-white rounded-lg shadow-sm text-rose-500"><Thermometer size={18} /></div>
-            <span className="text-xs font-medium text-rose-400">{t('temp', lang)}</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 bg-rose-50 rounded-xl text-rose-500"><Thermometer size={18} /></div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase">{t('temp', lang)}</span>
           </div>
-          <div className="mt-3">
-            <p className="text-lg font-bold text-slate-700">{stats.lastTemp?.details.temperature ? `${stats.lastTemp.details.temperature}°C` : '--'}</p>
-            <p className="text-xs text-slate-500">{getTimeAgo(stats.lastTemp?.timestamp)}</p>
+          <div>
+            <p className="text-xl font-bold text-slate-700">{stats.lastTemp?.details.temperature ? `${stats.lastTemp.details.temperature}°C` : '--'}</p>
+            <p className="text-xs text-slate-500 font-medium">{getTimeAgo(stats.lastTemp?.timestamp)}</p>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
       <div>
-        <h3 className="text-slate-700 font-semibold mb-3 px-1">{t('quick_log', lang)}</h3>
+        <h3 className="text-slate-800 font-bold text-sm mb-3 px-1">{t('quick_log', lang)}</h3>
         <div className="grid grid-cols-4 gap-2">
-            <button onClick={() => onQuickLog(LogType.FEEDING)} className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm active:scale-95 transition-transform">
-                <Utensils size={20} className="text-blue-500 mb-1" />
-                <span className="text-[10px] font-medium text-slate-600">{t('feed', lang)}</span>
+            <button onClick={() => onQuickLog(LogType.FEEDING)} className="flex flex-col items-center justify-center py-3 px-1 bg-white border border-slate-200 rounded-2xl shadow-sm active:scale-95 transition-all hover:border-blue-200 hover:shadow-md group">
+                <Utensils size={20} className="text-blue-500 mb-1 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-bold text-slate-600">{t('feed', lang)}</span>
             </button>
-            <button onClick={() => onQuickLog(LogType.SLEEP)} className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm active:scale-95 transition-transform">
-                <Moon size={20} className="text-indigo-500 mb-1" />
-                <span className="text-[10px] font-medium text-slate-600">{t('sleep', lang)}</span>
+            <button onClick={() => onQuickLog(LogType.SLEEP)} className="flex flex-col items-center justify-center py-3 px-1 bg-white border border-slate-200 rounded-2xl shadow-sm active:scale-95 transition-all hover:border-indigo-200 hover:shadow-md group">
+                <Moon size={20} className="text-indigo-500 mb-1 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-bold text-slate-600">{t('sleep', lang)}</span>
             </button>
-            <button onClick={() => onQuickLog(LogType.DIAPER)} className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm active:scale-95 transition-transform">
-                <Droplets size={20} className="text-emerald-500 mb-1" />
-                <span className="text-[10px] font-medium text-slate-600">{t('diaper', lang)}</span>
+            <button onClick={() => onQuickLog(LogType.DIAPER)} className="flex flex-col items-center justify-center py-3 px-1 bg-white border border-slate-200 rounded-2xl shadow-sm active:scale-95 transition-all hover:border-emerald-200 hover:shadow-md group">
+                <Droplets size={20} className="text-emerald-500 mb-1 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-bold text-slate-600">{t('diaper', lang)}</span>
             </button>
-            <button onClick={() => onQuickLog(LogType.TEMPERATURE)} className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm active:scale-95 transition-transform">
-                <Thermometer size={20} className="text-rose-500 mb-1" />
-                <span className="text-[10px] font-medium text-slate-600">{t('temp', lang)}</span>
+            <button onClick={() => onQuickLog(LogType.TEMPERATURE)} className="flex flex-col items-center justify-center py-3 px-1 bg-white border border-slate-200 rounded-2xl shadow-sm active:scale-95 transition-all hover:border-rose-200 hover:shadow-md group">
+                <Thermometer size={20} className="text-rose-500 mb-1 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-bold text-slate-600">{t('temp', lang)}</span>
             </button>
         </div>
       </div>
 
       {/* Recent Activity List */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-50">
-            <h3 className="text-slate-700 font-semibold text-sm">{t('recent_activity', lang)}</h3>
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-4 border-b border-slate-50 flex justify-between items-center">
+            <h3 className="text-slate-800 font-bold text-sm">{t('recent_activity', lang)}</h3>
         </div>
         <div>
             {stats.sortedLogs.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-sm">No logs yet.</div>
             ) : (
                 stats.sortedLogs.map(log => (
-                    <div key={log.id} className="flex items-center p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                        <div className={`w-2 h-2 rounded-full mr-4 ${
-                            log.type === LogType.FEEDING ? 'bg-blue-400' :
-                            log.type === LogType.SLEEP ? 'bg-indigo-400' :
-                            log.type === LogType.DIAPER ? 'bg-emerald-400' :
-                            log.type === LogType.TEMPERATURE ? 'bg-rose-400' : 'bg-slate-400'
-                        }`} />
+                    <div key={log.id} className="flex items-center p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors group">
+                        <div className={`w-8 h-8 rounded-full mr-4 flex items-center justify-center ${
+                            log.type === LogType.FEEDING ? 'bg-blue-100 text-blue-500' :
+                            log.type === LogType.SLEEP ? 'bg-indigo-100 text-indigo-500' :
+                            log.type === LogType.DIAPER ? 'bg-emerald-100 text-emerald-500' :
+                            log.type === LogType.TEMPERATURE ? 'bg-rose-100 text-rose-500' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                            {log.type === LogType.FEEDING && <Utensils size={14} />}
+                            {log.type === LogType.SLEEP && <Moon size={14} />}
+                            {log.type === LogType.DIAPER && <Droplets size={14} />}
+                            {log.type === LogType.TEMPERATURE && <Thermometer size={14} />}
+                        </div>
                         <div className="flex-1">
-                            <p className="text-sm font-medium text-slate-700 capitalize">{log.type.toLowerCase()}</p>
+                            <p className="text-sm font-bold text-slate-700 capitalize group-hover:text-indigo-600 transition-colors">{log.type.toLowerCase()}</p>
                             <p className="text-xs text-slate-500">
                                 {log.type === LogType.FEEDING && log.details.amount ? `${log.details.amount}oz` : 
                                  log.type === LogType.TEMPERATURE ? `${log.details.temperature}°C` :
@@ -191,7 +198,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog 
                             </p>
                         </div>
                         <div className="text-right">
-                             <p className="text-xs text-slate-400"><Clock size={10} className="inline mr-1"/>{log.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                             <p className="text-xs text-slate-400 font-medium"><Clock size={10} className="inline mr-1"/>{log.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                         </div>
                     </div>
                 ))

@@ -1,20 +1,36 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# NurtureAI - Agentic Infant Health Monitor
 
-# Run and deploy your AI Studio app
+An intelligent, agentic health monitoring interface for infants that tracks vitals, sleep, and feeding, providing real-time AI insights and pediatric guidance using the Gemini API.
 
-This contains everything you need to run your app locally.
+## Setup Instructions
 
-View your app in AI Studio: https://ai.studio/apps/drive/1ZbE_OsFBedImvTvnNZ2icwBR4iSRjsKj
+1.  **Clone the repository:**
+    ```bash
+    git clone <your-repo-url>
+    cd nurture-ai
+    ```
 
-## Run Locally
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-**Prerequisites:**  Node.js
+3.  **Configure Environment Variables:**
+    *   Create a file named `.env` in the root directory.
+    *   Add your Google Gemini API Key:
+        ```env
+        API_KEY=your_actual_api_key_here
+        ```
+    *   *Note: Never commit `.env` to GitHub.*
 
+4.  **Run the application:**
+    ```bash
+    npm run dev
+    ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Tech Stack
+*   React 18 + Vite
+*   TailwindCSS
+*   Google GenAI SDK
+*   Lucide React (Icons)
+*   Recharts (Data Visualization)
