@@ -97,21 +97,6 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     };
   }, []);
 
-  // Auto-speak Logic for Telugu
-  useEffect(() => {
-    if (profile.language === 'te') {
-        const lastMsg = messages[messages.length - 1];
-        // Speak if it's a model message, and we aren't currently loading a new one
-        if (lastMsg && lastMsg.role === 'model' && !isLoading) {
-             // Delay slightly to allow UI render
-             const timer = setTimeout(() => {
-                 handleSpeak(lastMsg.id, lastMsg.text);
-             }, 800);
-             return () => clearTimeout(timer);
-        }
-    }
-  }, [messages.length, isLoading, profile.language]);
-
   const toggleListening = () => {
     if (isListening) {
       recognitionRef.current?.stop();

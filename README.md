@@ -1,31 +1,20 @@
-# NurtureAI - Agentic Infant Health Monitor
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-An intelligent, agentic health monitoring interface for infants that tracks vitals, sleep, and feeding, providing real-time AI insights and pediatric guidance using the Gemini API.
+# Run and deploy your AI Studio app
 
-## 🚀 Quick Setup (VS Code)
+This contains everything you need to run your app locally.
 
-1.  **Install Dependencies:** (Fixes 'vite is not recognized' error)
-    ```bash
-    npm install
-    ```
+View your app in AI Studio: https://ai.studio/apps/drive/1ZbE_OsFBedImvTvnNZ2icwBR4iSRjsKj
 
-2.  **Configure API Key:**
-    *   Create a file named `.env` in the root folder.
-    *   Add your key: `API_KEY=AIzaSy...`
+## Run Locally
 
-3.  **Run Locally:**
-    ```bash
-    npm run dev
-    ```
-    Open the link shown in the terminal (usually `http://localhost:5173`).
+**Prerequisites:**  Node.js
 
-## 🛠️ Tech Stack
-*   React 18 + Vite
-*   TailwindCSS
-*   Google GenAI SDK (Gemini 2.5 Flash)
-*   Lucide React (Icons)
-*   Recharts (Data Visualization)
 
-## ⚠️ Troubleshooting
-*   **'vite' is not recognized:** You skipped step 1. Run `npm install`.
-*   **API Key Error:** Ensure your `.env` file is named exactly `.env` and is in the root directory (not inside `src` or `components`).
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
