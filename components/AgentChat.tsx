@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, Stethoscope, ChevronRight, Link2, Mic, MicOff } from 'lucide-react';
+import { Send, Bot, User, Sparkles, ChevronRight, Link2, Mic, MicOff, Volume2, Square } from 'lucide-react';
 import { ChatMessage, LogEntry, InfantProfile } from '../types';
 import { generateHealthInsight } from '../services/geminiService';
-import { t } from '../utils/translations';
 
 interface AgentChatProps {
   logs: LogEntry[];
@@ -75,6 +74,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -88,6 +89,13 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
 
   useEffect(scrollToBottom, [messages, isLoading]);
   useEffect(() => { onUpdateHistory(messages); }, [messages, onUpdateHistory]);
+
+  // Clean up speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   const toggleListening = () => {
     if (isListening) {
@@ -128,6 +136,36 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     recognition.start();
   };
 
+  const handleSpeak = (id: string, text: string) => {
+    // If currently speaking this message, stop it
+    if (speakingId === id) {
+        window.speechSynthesis.cancel();
+        setSpeakingId(null);
+        return;
+    }
+
+    // Stop any other speech
+    window.speechSynthesis.cancel();
+
+    // Create new utterance
+    // Remove markdown symbols for cleaner speech
+    const cleanText = text.replace(/\*\*/g, '').replace(/\[.*?\]\(.*?\)/g, 'reference link');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    // Set Language
+    utterance.lang = profile.language === 'te' ? 'te-IN' : 'en-US';
+    
+    // Optional: Adjust rate/pitch
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    utterance.onstart = () => setSpeakingId(id);
+    utterance.onend = () => setSpeakingId(null);
+    utterance.onerror = () => setSpeakingId(null);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
     if (!textToSend.trim() || isLoading) return;
@@ -157,6 +195,9 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         };
 
         setMessages(prev => [...prev, aiMsg]);
+        
+        // Optional: Auto-speak in Telugu if enabled? 
+        // For now, let's keep it manual to avoid annoyance, unless requested.
     } catch (e) {
         const errorMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -184,15 +225,33 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                     {msg.role === 'user' ? <User size={14} /> : <Bot size={16} />}
                 </div>
 
-                {/* Bubble */}
-                <div
-                    className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                    msg.role === 'user'
-                        ? 'bg-indigo-600 text-white rounded-br-none'
-                        : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none'
-                    }`}
-                >
-                    {msg.role === 'model' ? formatText(msg.text) : msg.text}
+                {/* Bubble Container */}
+                <div className="flex flex-col gap-1 items-start">
+                    {/* Bubble */}
+                    <div
+                        className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                        msg.role === 'user'
+                            ? 'bg-indigo-600 text-white rounded-br-none'
+                            : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none'
+                        }`}
+                    >
+                        {msg.role === 'model' ? formatText(msg.text) : msg.text}
+                    </div>
+                    
+                    {/* Actions for Model (TTS) */}
+                    {msg.role === 'model' && (
+                        <button 
+                            onClick={() => handleSpeak(msg.id, msg.text)}
+                            className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full transition-colors ${
+                                speakingId === msg.id 
+                                ? 'bg-indigo-100 text-indigo-600 animate-pulse' 
+                                : 'text-slate-400 hover:bg-slate-100 hover:text-indigo-500'
+                            }`}
+                        >
+                            {speakingId === msg.id ? <Square size={12} fill="currentColor" /> : <Volume2 size={12} />}
+                            {speakingId === msg.id ? (profile.language === 'te' ? 'ఆపు' : 'Stop') : (profile.language === 'te' ? 'వినండి' : 'Listen')}
+                        </button>
+                    )}
                 </div>
             </div>
           </div>
