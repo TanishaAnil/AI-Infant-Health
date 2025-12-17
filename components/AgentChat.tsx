@@ -97,6 +97,21 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     };
   }, []);
 
+  // Auto-speak Logic for Telugu
+  useEffect(() => {
+    if (profile.language === 'te') {
+        const lastMsg = messages[messages.length - 1];
+        // Speak if it's a model message, and we aren't currently loading a new one
+        if (lastMsg && lastMsg.role === 'model' && !isLoading) {
+             // Delay slightly to allow UI render
+             const timer = setTimeout(() => {
+                 handleSpeak(lastMsg.id, lastMsg.text);
+             }, 800);
+             return () => clearTimeout(timer);
+        }
+    }
+  }, [messages.length, isLoading, profile.language]);
+
   const toggleListening = () => {
     if (isListening) {
       recognitionRef.current?.stop();
@@ -149,7 +164,12 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
 
     // Create new utterance
     // Remove markdown symbols for cleaner speech
-    const cleanText = text.replace(/\*\*/g, '').replace(/\[.*?\]\(.*?\)/g, 'reference link');
+    // Remove links [title](url) -> title
+    const cleanText = text
+        .replace(/\*\*/g, '') // bold
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1') // links
+        .replace(/[#*]/g, ''); // headings/bullets
+        
     const utterance = new SpeechSynthesisUtterance(cleanText);
     
     // Set Language
@@ -180,6 +200,9 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
+    // Stop speaking if user interrupts
+    window.speechSynthesis.cancel();
+    setSpeakingId(null);
 
     // Send recent context
     const history = messages.slice(-8).map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
@@ -196,8 +219,6 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
 
         setMessages(prev => [...prev, aiMsg]);
         
-        // Optional: Auto-speak in Telugu if enabled? 
-        // For now, let's keep it manual to avoid annoyance, unless requested.
     } catch (e) {
         const errorMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),

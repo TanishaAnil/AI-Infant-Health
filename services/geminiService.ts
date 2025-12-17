@@ -90,38 +90,65 @@ export const generateHealthInsight = async (logs: LogEntry[], query: string, pro
     const client = getAi();
     if (!client) throw new Error("AI Client failed to initialize");
 
-    const response: GenerateContentResponse = await client.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        systemInstruction: getSystemInstruction(profile),
-        temperature: 0.3,
-        tools: [{ googleSearch: {} }],
-      }
-    });
+    // Helper to format response
+    const processResponse = (response: GenerateContentResponse) => {
+        let finalText = response.text || "I apologize, I cannot provide a consultation right now.";
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        if (groundingChunks && groundingChunks.length > 0) {
+          const sources = groundingChunks
+            .map((chunk: any) => chunk.web?.title ? `- [${chunk.web.title}](${chunk.web.uri})` : null)
+            .filter(Boolean)
+            .join('\n');
+          
+          if (sources) {
+            finalText += `\n\n**External Web References:**\n${sources}`;
+          }
+        }
+        return finalText;
+    };
 
-    let finalText = response.text || "I apologize, I cannot provide a consultation right now.";
+    // ATTEMPT 1: With Google Search Tool
+    try {
+        const response = await client.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                systemInstruction: getSystemInstruction(profile),
+                temperature: 0.3,
+                tools: [{ googleSearch: {} }],
+            }
+        });
+        return processResponse(response);
+    } catch (searchError: any) {
+        console.warn("Search tool failed, retrying without search:", searchError);
+        
+        // ATTEMPT 2: Fallback without tools (Standard Generation)
+        // Only retry if it's not an API Key error
+        if (searchError.message?.includes('API key')) {
+             throw searchError;
+        }
 
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    if (groundingChunks && groundingChunks.length > 0) {
-      const sources = groundingChunks
-        .map((chunk: any) => chunk.web?.title ? `- [${chunk.web.title}](${chunk.web.uri})` : null)
-        .filter(Boolean)
-        .join('\n');
-      
-      if (sources) {
-        finalText += `\n\n**External Web References:**\n${sources}`;
-      }
+        const response = await client.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                systemInstruction: getSystemInstruction(profile),
+                temperature: 0.3,
+                // No tools in fallback
+            }
+        });
+        return response.text || "I apologize, I cannot provide a consultation right now.";
     }
-
-    return finalText;
 
   } catch (error: any) {
     console.error("Gemini API Error details:", error);
+    
     if (error.message?.includes('API key')) {
-        return "System Alert: Medical Database Connection Failed (API Key missing or invalid). Please check your .env file.";
+        return "⚠️ **System Alert**: Medical Database Connection Failed.\n\n**Reason**: API Key missing or invalid.\n**Fix**: Check your `.env` file.";
     }
-    return "I am having trouble accessing the medical protocols. Please consult a physical doctor immediately if the situation is urgent.";
+
+    // Return the actual error message to help the user debug
+    return `⚠️ **Connection Error**: Unable to reach Dr. NurtureAI.\n\n**Technical Details**: ${error.message || "Unknown Network Error"}.\n\nPlease try again in a moment.`;
   }
 };
 
@@ -178,6 +205,6 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
         return response.text || "Report generation failed.";
       } catch (error) {
         console.error("Report Error:", error);
-        return "Could not generate report due to an error.";
+        return `Report Generation Failed: ${error instanceof Error ? error.message : "Unknown Error"}`;
       }
 }
