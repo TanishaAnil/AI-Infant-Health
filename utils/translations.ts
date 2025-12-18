@@ -1,3 +1,4 @@
+
 import { Language } from '../types';
 
 export const t = (key: string, lang: Language): string => {
@@ -22,6 +23,9 @@ export const t = (key: string, lang: Language): string => {
     'sleep': { en: 'Sleep', te: 'నిద్ర' },
     'diaper': { en: 'Diaper', te: 'డైపర్' },
     'temp': { en: 'Temp', te: 'ఉష్ణోగ్రత' },
+    'heart_rate': { en: 'Heart Rate', te: 'గుండె వేగం' },
+    'spo2': { en: 'SpO2 (Oxygen)', te: 'ఆక్సిజన్ స్థాయి' },
+    'glucose': { en: 'Blood Sugar', te: 'రక్తంలో చక్కెర' },
     'kb_active': { en: 'Knowledge Base Active', te: 'జ్ఞాన భాండాగారం యాక్టివ్‌గా ఉంది' },
   };
 

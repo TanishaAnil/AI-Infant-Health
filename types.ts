@@ -1,10 +1,14 @@
+
 export enum LogType {
   FEEDING = 'FEEDING',
   SLEEP = 'SLEEP',
   DIAPER = 'DIAPER',
   GROWTH = 'GROWTH',
   TEMPERATURE = 'TEMPERATURE',
-  SYMPTOM = 'SYMPTOM'
+  SYMPTOM = 'SYMPTOM',
+  HEART_RATE = 'HEART_RATE',
+  SPO2 = 'SPO2',
+  BLOOD_GLUCOSE = 'BLOOD_GLUCOSE'
 }
 
 export enum FeedType {
@@ -31,6 +35,9 @@ export interface LogEntry {
     side?: 'left' | 'right' | 'both';
     contents?: string; // for diaper
     temperature?: number; // celsius
+    bpm?: number; // heart rate
+    oxygen?: number; // spo2 percentage
+    glucose?: number; // mg/dL
     symptom?: string;
     note?: string;
   };
