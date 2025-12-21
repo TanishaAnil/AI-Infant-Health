@@ -1,4 +1,3 @@
-
 import { Language } from '../types';
 
 export const t = (key: string, lang: Language): string => {
@@ -19,14 +18,20 @@ export const t = (key: string, lang: Language): string => {
     'generating': { en: 'Generating...', te: 'రూపొందిస్తోంది...' },
     'quick_log': { en: 'Quick Log', te: 'త్వరిత నమోదు' },
     'recent_activity': { en: 'Recent Activity', te: 'ఇటీవలి కార్యకలాపాలు' },
-    'feed': { en: 'Feed', te: 'ఆహారం' },
+    'feeding': { en: 'Feed', te: 'ఆహారం' },
     'sleep': { en: 'Sleep', te: 'నిద్ర' },
     'diaper': { en: 'Diaper', te: 'డైపర్' },
-    'temp': { en: 'Temp', te: 'ఉష్ణోగ్రత' },
+    'temperature': { en: 'Temp', te: 'ఉష్ణోగ్రత' },
     'heart_rate': { en: 'Heart Rate', te: 'గుండె వేగం' },
     'spo2': { en: 'SpO2 (Oxygen)', te: 'ఆక్సిజన్ స్థాయి' },
-    'glucose': { en: 'Blood Sugar', te: 'రక్తంలో చక్కెర' },
+    'blood_glucose': { en: 'Blood Sugar', te: 'రక్తంలో చక్కెర' },
     'kb_active': { en: 'Knowledge Base Active', te: 'జ్ఞాన భాండాగారం యాక్టివ్‌గా ఉంది' },
+    'wet': { en: 'Wet', te: 'తడి' },
+    'dirty': { en: 'Dirty', te: 'మురికి' },
+    'both': { en: 'Both', te: 'రెండూ' },
+    'duration_min': { en: 'Duration (Min)', te: 'సమయం (నిమిషాలు)' },
+    'observations': { en: 'Observations', te: 'పరిశీలనలు' },
+    'save': { en: 'Save Log', te: 'సేవ్ చేయండి' }
   };
 
   return translations[key]?.[lang] || key;

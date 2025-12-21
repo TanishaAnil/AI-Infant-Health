@@ -20,7 +20,6 @@ const App: React.FC = () => {
   const [dailyDigest, setDailyDigest] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 
-  // Agentic Action: Proactive Analysis on load (only if logged in)
   useEffect(() => {
     const fetchDigest = async () => {
         if(isAuthenticated && profile && logs.length > 0) {
@@ -34,7 +33,6 @@ const App: React.FC = () => {
   const handleLogin = (userProfile: InfantProfile) => {
     setProfile(userProfile);
     setIsAuthenticated(true);
-    // Add some mock data for the demo if empty
     if (logs.length === 0) {
         setLogs([
             { id: '1', type: LogType.FEEDING, timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), details: { amount: 4 } },
@@ -53,27 +51,19 @@ const App: React.FC = () => {
     setLogs(prev => [newLog, ...prev]);
   };
 
-  // 1. Patient Login Flow
   if (!isAuthenticated || !profile) {
     return <Login onLogin={handleLogin} />;
   }
 
-  // 2. Main App (Conversation & Monitoring)
   return (
     <div className="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
-      
-      {/* Main Container */}
       <div className="max-w-md mx-auto w-full h-full flex flex-col sm:border-x sm:border-slate-200 sm:bg-white sm:shadow-2xl">
-        
-        {/* Desktop Header */}
         <div className="hidden sm:flex items-center justify-between p-6 border-b border-slate-100 shrink-0 bg-white z-10">
              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-emerald-500 bg-clip-text text-transparent">NurtureAI</h1>
              <span className="text-xs font-semibold bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full uppercase">{profile.language}</span>
         </div>
 
-        {/* Dynamic Content - Flex-1 means it takes all remaining height. Overflow-hidden handles internal scrolling */}
         <main className="flex-1 overflow-hidden relative flex flex-col bg-slate-50/50">
-          
           {view === 'dashboard' && (
             <div className="flex-1 overflow-y-auto p-4 pb-4">
                 {dailyDigest && (
@@ -109,16 +99,14 @@ const App: React.FC = () => {
           )}
         </main>
 
-        {/* Bottom Navigation - Static Footer (Shrink-0) - No overlapping! */}
         <div className="shrink-0 bg-white border-t border-slate-200 p-2 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             <div className="grid grid-cols-5 gap-1 relative">
                 <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={20} />} label={t('dashboard', profile.language)} />
                 <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={<Activity size={20} />} label={t('trends', profile.language)} />
                 
-                {/* Center FAB - Floats strictly up from the footer, ensuring it never gets 'lost' */}
                 <div className="relative -top-6 flex justify-center pointer-events-none">
                     <button 
-                        onClick={() => handleQuickLog(LogType.FEEDING)} 
+                        onClick={() => handleQuickLog(LogType.SYMPTOM)} 
                         className="pointer-events-auto w-14 h-14 bg-indigo-600 rounded-full shadow-lg shadow-indigo-300 flex items-center justify-center text-white active:scale-95 transition-transform border-4 border-slate-50"
                     >
                         <PlusCircle size={28} />
@@ -126,17 +114,17 @@ const App: React.FC = () => {
                 </div>
 
                 <NavButton active={view === 'logs'} onClick={() => setView('logs')} icon={<MessageCircle size={20} />} label={t('agent', profile.language)} />
-                <NavButton active={view === 'report'} onClick={() => setView('report')} icon={<FileText size={20} />} label={t('report', profile.language)} />
+                <NavButton active={view === 'report'} onClick={() => setView('report'} icon={<FileText size={20} />} label={t('report', profile.language)} />
             </div>
         </div>
-
       </div>
       
       <LogModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         type={modalType} 
-        onSave={saveLog} 
+        onSave={saveLog}
+        language={profile.language}
       />
     </div>
   );
