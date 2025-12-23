@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { LogEntry, LogType, InfantProfile, AgeGroup } from "../types";
+import { LogEntry, LogType, InfantProfile } from "../types";
 import { REFERENCE_DOCS } from "./documents";
 
 let ai: GoogleGenAI | null = null;
@@ -15,65 +15,86 @@ const getAi = () => {
 };
 
 const getSystemInstruction = (profile: InfantProfile) => {
+  const docContext = REFERENCE_DOCS.map(d => `${d.title}: ${d.description}`).join('\n');
+
   return `
-You are **Dr. NurtureAI**, a senior Pediatrician.
-Language: ${profile.language === 'te' ? 'Telugu (Respond ONLY in Telugu script)' : 'English'}
+You are **Dr. NurtureAI**, an expert Pediatrician. 
+You are consulting on ${profile.name} (${profile.ageGroup}, ${profile.weight}kg).
+Language: ${profile.language === 'te' ? 'Telugu script' : 'English'}
 
-### PEDIATRIC REFERENCE RANGES:
-- **SpO2**: Normal 95-100%. Emergency if <92%.
-- **Heart Rate**: Newborn (100-160), 1yr (80-130).
-- **Diabetes Screening**: Look for the "3 Ps" in children: Polyuria (too much urine), Polydipsia (too much thirst), Polyphagia (extreme hunger), and sudden weight loss. If glucose >180 mg/dL or ketotic breath is mentioned, triage immediately.
+### KNOWLEDGE BASE:
+Use these primary guidelines for every response:
+${docContext}
 
-### PROTOCOL:
-1. TRIAGE: Check for Respiratory Distress, Cyanosis (blue lips), or Lethargy.
-2. VITALS ANALYSIS: Comment on Heart Rate, SpO2, and Temperature logs provided.
-3. DIABETES CARE: If blood sugar is logged, provide pediatric context.
-4. RED FLAGS: Clearly state when to visit ER.
+### MANDATORY CLINICAL PROTOCOL:
+1. **Precautions**: Always include precautions from Google Search and the provided docs.
+2. **Interactive Triage**: Ask specifically about:
+   - DIET: Is the child eating/breastfeeding normally?
+   - SYMPTOMS: Ask about lethargy, urine frequency, or breathing sounds.
+3. **Medications**: Suggest common pediatric medicines (e.g., Paracetamol) ONLY with weight-based caution (${profile.weight}kg). Always include a disclaimer.
+4. **Red Flags**: List specific "Emergency Signs" clearly.
+5. **Return to Doctor**: Explicitly state: "Return to the doctor if..." or "Go to ER immediately if...".
 
-Strictly respond in the user's selected language (${profile.language}).
+### OUTPUT RULES:
+- **No raw markdown**: Do not use '#' for headers. Use bold text (**) for section titles.
+- **Telugu Support**: If Telugu is selected, use strictly Telugu script.
+- **Clarity**: Use bullet points for lists.
 `;
 };
 
-const handleApiError = (error: any, profile: InfantProfile) => {
-  if (error?.message?.includes('429')) {
-    return profile.language === 'te' 
-      ? "⚠️ **పరిమితి ముగిసింది**: దయచేసి ఒక నిమిషం ఆగి మళ్ళీ ప్రయత్నించండి."
-      : "⚠️ **Quota Exceeded**: Please wait 60 seconds and try again.";
-  }
-  return profile.language === 'te' ? "⚠️ కనెక్షన్ లోపం." : "⚠️ Connection Error.";
-};
+export interface AIResponse {
+  text: string;
+  sources: { title: string; uri: string }[];
+}
 
-export const generateHealthInsight = async (logs: LogEntry[], query: string, profile: InfantProfile, chatHistory: string): Promise<string> => {
+export const generateHealthInsight = async (
+  logs: LogEntry[], 
+  query: string, 
+  profile: InfantProfile, 
+  chatHistory: string
+): Promise<AIResponse> => {
   try {
     const client = getAi();
     if (!client) throw new Error("API Key Missing");
 
-    const logSummary = logs.slice(0, 20).map(log => {
+    const logSummary = logs.slice(0, 15).map(log => {
       return `[${log.timestamp.toLocaleString()}] ${log.type}: ${JSON.stringify(log.details)}`;
     }).join('\n');
 
-    const prompt = `PATIENT PROFILE: ${profile.name}, ${profile.ageGroup}.
-    
-    HISTORY:
-    ${chatHistory}
-    
-    LOGS:
-    ${logSummary}
-    
-    QUERY: "${query}"`;
+    const prompt = `
+CONTEXT:
+${chatHistory}
+
+LOGS:
+${logSummary}
+
+PARENT QUERY: "${query}"
+Provide precautions from Google, check internal docs, ask about diet/symptoms, and state when to return to doctor.
+`;
 
     const response = await client.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview',
         contents: prompt,
         config: {
             systemInstruction: getSystemInstruction(profile),
-            temperature: 0.2,
+            tools: [{ googleSearch: {} }],
+            temperature: 0.3,
         }
     });
     
-    return response.text || "Consultation unavailable.";
+    const text = response.text || "Consultation unavailable.";
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
+      .filter(Boolean) || [];
+
+    return { text, sources };
+
   } catch (error: any) {
-    return handleApiError(error, profile);
+    console.error(error);
+    return { 
+      text: profile.language === 'te' ? "⚠️ కనెక్షన్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి." : "⚠️ Connection error. Please try again.", 
+      sources: [] 
+    };
   }
 };
 
@@ -81,7 +102,7 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
   try {
     const client = getAi();
     if (!client || logs.length === 0) return "";
-    const prompt = `Provide a health summary for ${profile.name} based on vitals. Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.`;
+    const prompt = `Health summary for ${profile.name}. Focus on vitals and diet.`;
     const response = await client.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
@@ -97,14 +118,14 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
     try {
         const client = getAi();
         if (!client) throw new Error("API Key Missing");
-        const prompt = `Clinical Progress Report for ${profile.name}. Include vitals analysis. Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.`;
+        const prompt = `Clinical Report for ${profile.name}. Summarize logs and chat history.`;
         const response = await client.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-3-pro-preview',
           contents: prompt,
           config: { systemInstruction: getSystemInstruction(profile) }
         });
-        return response.text || "Report failed.";
+        return response.text || "Report generation failed.";
       } catch (error) {
-        return handleApiError(error, profile);
+        return "Error generating report.";
       }
 };
