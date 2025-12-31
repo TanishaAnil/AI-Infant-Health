@@ -18,29 +18,26 @@ const getSystemInstruction = (profile: InfantProfile) => {
   const docContext = REFERENCE_DOCS.map(d => `${d.title}: ${d.description}`).join('\n');
 
   return `
-You are **Dr. NurtureAI**, a specialized Agentic Pediatrician. 
-Your core workflow is the **Cross-Lingual Clinical Reasoning Loop**.
+You are **Dr. NurtureAI**, a highly intelligent Agentic Pediatrician. 
+You bridge the gap between parental concern and clinical evidence.
 
-### OPERATIONAL PIPELINE (Mandatory):
-1. **Language Detection & Translation**: If the parent inputs in Telugu, immediately translate the medical intent into English clinical terms.
-2. **Global Research (RAG)**: Consult the English F-IMNCI and WHO guidelines provided below to find standard protocols.
-3. **Real-time Grounding**: Use the Google Search tool in English to check for current health alerts, medication recalls, or local viral outbreaks related to the symptoms.
-4. **Synthesis & Synthesis**: Formulate a response that is medically sound based on your research.
-5. **Localization**: Output the final response in natural, empathetic Telugu script (or English if requested).
+### THE CROSS-LINGUAL REASONING LOOP:
+When a parent provides a query (especially in Telugu):
+1. **Clinical Mapping**: Map Telugu symptoms to English medical terms.
+2. **Evidence-Based Research**: Consult your internal training, the English WHO/F-IMNCI documents, and use Google Search in English for the latest pediatric safety guidelines.
+3. **Synthesis**: Combine global clinical accuracy with cultural empathy.
+4. **Output**: Deliver the final answer in ${profile.language === 'te' ? 'Telugu script' : 'English'}.
 
-### REFERENCE DOCUMENTS (English Context):
+### REFERENCE CONTEXT:
 ${docContext}
 
-### CLINICAL PROTOCOLS:
-- **Triage**: If a symptom is mentioned, always ask about "Red Flags": breathing difficulty, poor feeding, or lethargy.
-- **Tone**: Professional yet reassuring.
-- **Citations**: Always provide the links found via Google Search grounding.
-- **Safety**: For a ${profile.weight}kg infant, advise caution with dosages and insist on physical pediatric consultation.
-
-### FORMATTING:
-- Use strictly Telugu script for Telugu output.
-- Use bold (**) for emphasizing key safety points.
-- No markdown headers (like #), use bold lines instead.
+### AGENTIC TRIAGE PROTOCOLS:
+- **Mandatory Triage**: Always check "Red Flags":
+  - "పాప/బాబు పాలు సరిగ్గా తాగుతున్నారా?" (Feeding)
+  - "శ్వాస తీసుకోవడంలో ఇబ్బంది ఉందా?" (Breathing)
+  - "చురుకుగా ఉన్నారా?" (Lethargy)
+- **Safety**: For a ${profile.weight}kg infant, advise consulting a physical doctor and caution on medication.
+- **Tone**: Professional, calming, and direct.
 `;
 };
 
@@ -57,7 +54,7 @@ export const generateHealthInsight = async (
 ): Promise<AIResponse> => {
   try {
     const client = getAi();
-    if (!client) throw new Error("API Key Missing. Please set your API_KEY environment variable.");
+    if (!client) throw new Error("API Key Missing. Please set API_KEY in your environment.");
 
     const logSummary = logs.slice(0, 15).map(log => {
       return `[${log.timestamp.toLocaleTimeString()}] ${log.type}: ${JSON.stringify(log.details)}`;
@@ -65,18 +62,15 @@ export const generateHealthInsight = async (
 
     const prompt = `
 [CONTEXT]
-Language: ${profile.language === 'te' ? 'TELUGU' : 'ENGLISH'}
-Baby Name: ${profile.name}, Weight: ${profile.weight}kg
-Recent Vitals/Logs: ${logSummary}
-Chat History: ${chatHistory}
+Baby: ${profile.name}, ${profile.weight}kg, Age Group: ${profile.ageGroup}
+Logs: ${logSummary}
+History: ${chatHistory}
 
-[USER INPUT]
+[USER QUERY]
 "${query}"
 
-[TASK]
-1. Map this input to English medical concepts.
-2. Use Google Search and internal F-IMNCI docs to verify the best advice.
-3. Provide a response in ${profile.language === 'te' ? 'Telugu script' : 'English'}.
+[INSTRUCTION]
+Respond in ${profile.language === 'te' ? 'Telugu Script' : 'English'}. Apply the Cross-Lingual Clinical Bridge.
 `;
 
     const response = await client.models.generateContent({
@@ -85,12 +79,12 @@ Chat History: ${chatHistory}
         config: {
             systemInstruction: getSystemInstruction(profile),
             tools: [{ googleSearch: {} }],
-            temperature: 0.1, // High precision for medical context
+            temperature: 0.1,
             thinkingConfig: { thinkingBudget: 0 }
         }
     });
     
-    const text = response.text || "Consultation currently unavailable.";
+    const text = response.text || "I am currently unable to process health data.";
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
       .filter(Boolean) || [];
@@ -98,11 +92,11 @@ Chat History: ${chatHistory}
     return { text, sources };
 
   } catch (error: any) {
-    console.error("Gemini Service Error:", error);
+    console.error("Gemini Service Connection Error:", error);
     return { 
       text: profile.language === 'te' 
-        ? "⚠️ కనెక్షన్ సమస్య. దయచేసి మీ API కీ మరియు ఇంటర్నెట్ సరిగ్గా ఉన్నాయో లేదో తనిఖీ చేయండి." 
-        : "⚠️ Connection error. Please verify your API Key and network settings.", 
+        ? "⚠️ కనెక్షన్ సమస్య. దయచేసి మళ్ళీ ప్రయత్నించండి." 
+        : "⚠️ Connection error. Please ensure your API_KEY is set and try again.", 
       sources: [] 
     };
   }
@@ -112,12 +106,12 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
   try {
     const client = getAi();
     if (!client || logs.length === 0) return "";
-    const prompt = `Summarize the baby's current status based on these logs in 2 brief sentences: ${JSON.stringify(logs.slice(0, 3))}. Output in ${profile.language === 'te' ? 'Telugu' : 'English'}.`;
+    const prompt = `Provide a 2-sentence summary of ${profile.name}'s status in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 3))}`;
     const response = await client.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: { 
-          systemInstruction: "Succinct pediatric status logger. No markdown. Use Telugu script if required." 
+          systemInstruction: "You are a concise pediatric monitor. No markdown. Plain text." 
       }
     });
     return response.text || "";
@@ -130,19 +124,16 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
     try {
         const client = getAi();
         if (!client) throw new Error("API Key Missing");
-        const prompt = `Convert the following data into a clinical report for a pediatrician. 
-        Baby: ${profile.name}, Weight: ${profile.weight}kg. 
-        Vitals: ${JSON.stringify(logs)}
-        Consultations: ${chatHistory}`;
+        const prompt = `Create a formal pediatric visit summary for ${profile.name}. Weight: ${profile.weight}kg. Logs: ${JSON.stringify(logs)}. History: ${chatHistory}`;
         
         const response = await client.models.generateContent({
           model: 'gemini-3-pro-preview',
           contents: prompt,
           config: { 
-              systemInstruction: "Professional medical documentation style. Use clear sections like 'Vital Signs Trend' and 'AI Recommendations'." 
+              systemInstruction: "Use professional clinical report formatting." 
           }
         });
-        return response.text || "Failed to generate report.";
+        return response.text || "Report generation unavailable.";
       } catch (error) {
         return "Error generating clinical report.";
       }
