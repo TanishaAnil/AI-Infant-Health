@@ -7,7 +7,7 @@ let ai: GoogleGenAI | null = null;
 
 const getAi = () => {
   const key = process.env.API_KEY;
-  if (!key) return null; 
+  if (!key || key === "") return null; 
   if (!ai) {
     ai = new GoogleGenAI({ apiKey: key });
   }
@@ -18,32 +18,31 @@ const getSystemInstruction = (profile: InfantProfile) => {
   const docContext = REFERENCE_DOCS.map(d => `${d.title}: ${d.description}`).join('\n');
 
   return `
-You are **Dr. NurtureAI**, a high-intelligence Agentic Pediatrician. 
-You specialize in bridging the gap between a parent's local language concerns and global medical gold-standards.
+You are **Dr. NurtureAI**, a world-class Agentic Pediatrician. 
+Your core capability is the **Cross-Lingual Clinical Bridge**.
 
-### THE CROSS-LINGUAL REASONING LOOP:
-When a parent provides a query (especially in Telugu):
-1. **Clinical Mapping**: Immediately map Telugu symptoms to their English medical equivalents (e.g., 'ఆయాసం' -> 'Respiratory distress').
-2. **Global Research**: Search your internal knowledge, the provided English F-IMNCI/WHO documents, and use Google Search in English for the most up-to-date pediatric safety guidelines.
-3. **Synthesis**: Create a response that combines global clinical accuracy with local cultural empathy.
-4. **Output**: Deliver the final answer in the parent's chosen language (${profile.language === 'te' ? 'Telugu' : 'English'}).
+### YOUR WORKFLOW:
+If the user speaks/types in Telugu:
+1. **Semantic Translation**: Map the Telugu concern to English medical terminology.
+2. **Clinical Research (English)**: Consult the F-IMNCI and WHO documents provided below.
+3. **Google Search (English)**: Use the Google Search tool in English to find the latest pediatric safety warnings, local viral trends, or medication recalls.
+4. **Synthesis & Localization**: Formulate a response that follows medical protocol and translate it back into warm, conversational, and natural Telugu script.
 
-### CLINICAL KNOWLEDGE BASE (RAG):
+### MEDICAL KNOWLEDGE BASE (English Source):
 ${docContext}
 
-### AGENTIC TRIAGE PROTOCOLS:
-- **Proactive Questioning**: You must NEVER simply answer. You must act as a doctor. If a symptom is reported, always ask about:
-  - Feeding: Is the baby drinking/breastfeeding normally?
-  - Activity: Is the baby unusually sleepy or lethargic?
-  - Red Flags: Check for fast breathing or abnormal urine frequency.
-- **Safety Grounding**: Use Google Search for current viral outbreaks or medication recalls.
-- **Dosage Caution**: For meds like Paracetamol, mention the ${profile.weight}kg weight-based approach but emphasize consulting a physical doctor.
+### MANDATORY CLINICAL TRIAGE:
+- **Red Flag Check**: If ANY symptom is reported, you MUST ask:
+  - "పాప/బాబు పాలు సరిగ్గా తాగుతున్నారా?" (Feeding status)
+  - "శరీరం వేడిగా ఉందా లేదా గాలి పీల్చడంలో ఇబ్బంది పడుతున్నారా?" (Temp/Breathing)
+  - "చురుకుగా ఉన్నారా లేదా ఎప్పుడూ నిద్రపోతున్నారా?" (Activity/Lethargy)
+- **Dosage Safety**: For a ${profile.weight}kg infant, never give specific dosages; instead, mention the weight-based approach of standard pediatrics and insist on a physical checkup.
+- **Grounding**: Always cite your sources via the Google Search grounding chunks.
 
-### TONE & STYLE:
-- Professional, reassuring, and clear.
+### OUTPUT FORMAT:
 - Use strictly Telugu script for Telugu responses.
-- Avoid complex medical jargon without explanation.
-- Use bold (**) for emphasizing key safety points.
+- Keep sentences short and voice-friendly.
+- Use bold (**) for critical warnings.
 `;
 };
 
@@ -62,23 +61,25 @@ export const generateHealthInsight = async (
     const client = getAi();
     if (!client) throw new Error("API Key Missing");
 
-    const logSummary = logs.slice(0, 20).map(log => {
+    const recentLogs = logs.slice(0, 10).map(log => {
       return `[${log.timestamp.toLocaleTimeString()}] ${log.type}: ${JSON.stringify(log.details)}`;
     }).join('\n');
 
     const prompt = `
-[CONTEXT]
+[PATIENT PROFILE]
 Language: ${profile.language === 'te' ? 'TELUGU' : 'ENGLISH'}
-Baby: ${profile.name}, Weight: ${profile.weight}kg, Age Group: ${profile.ageGroup}
-Recent History Summary: ${chatHistory}
-Vitals Log: 
-${logSummary}
+Name: ${profile.name}, Weight: ${profile.weight}kg
+History: ${chatHistory}
+Vitals: ${recentLogs}
 
-[USER QUERY]
+[PARENT CONCERN]
 "${query}"
 
-[INSTRUCTION]
-Apply the Cross-Lingual Pipeline. Research in English. Respond in ${profile.language === 'te' ? 'Telugu Script' : 'English'}.
+[INSTRUCTIONS]
+1. Translate context to English. 
+2. Research via English F-IMNCI docs and Google Search. 
+3. Respond in ${profile.language === 'te' ? 'Telugu Script' : 'English'}.
+4. Perform mandatory triage questions.
 `;
 
     const response = await client.models.generateContent({
@@ -87,12 +88,12 @@ Apply the Cross-Lingual Pipeline. Research in English. Respond in ${profile.lang
         config: {
             systemInstruction: getSystemInstruction(profile),
             tools: [{ googleSearch: {} }],
-            temperature: 0.1, // Precision over creativity
+            temperature: 0.15,
             thinkingConfig: { thinkingBudget: 0 }
         }
     });
     
-    const text = response.text || "Consultation unavailable.";
+    const text = response.text || "Consultation error.";
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
       .filter(Boolean) || [];
@@ -100,9 +101,12 @@ Apply the Cross-Lingual Pipeline. Research in English. Respond in ${profile.lang
     return { text, sources };
 
   } catch (error: any) {
-    console.error(error);
+    console.error("Gemini API Error:", error);
+    const isKeyError = error.message?.includes("API Key");
     return { 
-      text: profile.language === 'te' ? "⚠️ సర్వర్ కనెక్షన్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి." : "⚠️ Server connection error. Please try again.", 
+      text: profile.language === 'te' 
+        ? (isKeyError ? "⚠️ API కీ కనుగొనబడలేదు. దయచేసి వాతావరణ వేరియబుల్స్ తనిఖీ చేయండి." : "⚠️ సర్వర్ కనెక్షన్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.")
+        : (isKeyError ? "⚠️ API Key not found. Please check your environment variables." : "⚠️ Server connection error. Please try again."), 
       sources: [] 
     };
   }
@@ -112,12 +116,12 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
   try {
     const client = getAi();
     if (!client || logs.length === 0) return "";
-    const prompt = `Summarize current status for ${profile.name} in 2 sentences in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 5))}`;
+    const prompt = `Summarize current status for ${profile.name} in 2 sentences in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 3))}`;
     const response = await client.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: { 
-          systemInstruction: "You are a succinct pediatric logger. If language is Telugu, use Telugu script. No markdown." 
+          systemInstruction: "You are a succinct pediatric health logger. Use plain text." 
       }
     });
     return response.text || "";
@@ -130,17 +134,16 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
     try {
         const client = getAi();
         if (!client) throw new Error("API Key Missing");
-        const prompt = `Convert the following health logs and chat consultations into a Professional Clinical Report for a Pediatrician.
-        Patient: ${profile.name}
-        Weight: ${profile.weight}kg
-        History: ${chatHistory}
-        Logs: ${JSON.stringify(logs)}`;
+        const prompt = `Generate a Formal Pediatric Report. 
+        Patient: ${profile.name}, ${profile.weight}kg. 
+        Recent Logs: ${JSON.stringify(logs.slice(0, 20))}
+        Consulations: ${chatHistory}`;
         
         const response = await client.models.generateContent({
           model: 'gemini-3-pro-preview',
           contents: prompt,
           config: { 
-              systemInstruction: "Format as a clinical summary. Use headers like 'History of Present Illness', 'Vital Signs Summary', and 'AI Consultation Notes'. Clear and concise." 
+              systemInstruction: "Format as a professional medical report for a hospital visit." 
           }
         });
         return response.text || "Report generation failed.";
