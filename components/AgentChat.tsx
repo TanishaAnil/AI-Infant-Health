@@ -58,7 +58,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
       role: 'model',
       text: profile.language === 'te' 
         ? `నమస్కారం ${profile.parentName}. నేను మీ సహాయకుడిని. ${profile.name} ఆరోగ్యం గురించి ఏదైనా అడగండి.`
-        : `Hello ${profile.parentName}. I am your health assistant. How can I help with ${profile.name}'s care today?`,
+        : `Hello ${profile.parentName}. I am your assistant. How can I help with ${profile.name}'s care today?`,
       timestamp: new Date()
     }
   ]);
@@ -103,7 +103,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.replace(/[*#]/g, ''));
     utterance.lang = profile.language === 'te' ? 'te-IN' : 'en-US';
-    utterance.rate = 0.95;
+    utterance.rate = 1.0;
     utterance.onstart = () => setSpeakingId(id);
     utterance.onend = () => setSpeakingId(null);
     window.speechSynthesis.speak(utterance);
@@ -117,7 +117,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
-    setResearchStatus(profile.language === 'te' ? 'విశ్లేషిస్తున్నాను...' : 'Analyzing vitals and documentation...');
+    setResearchStatus(profile.language === 'te' ? 'పరిశీలిస్తున్నాను...' : 'Processing...');
 
     const history = messages.slice(-5).map(m => `${m.role}: ${m.text}`).join('\n');
 
@@ -127,7 +127,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         setMessages(prev => [...prev, aiMsg]);
         if (sources.length > 0) setSourcesMap(prev => ({ ...prev, [aiMsg.id]: sources }));
     } catch (e) {
-        setMessages(prev => [...prev, { id: 'err', role: 'model', text: profile.language === 'te' ? "క్షమించాలి, మళ్ళీ ప్రయత్నించండి." : "Connection issue. Please retry.", timestamp: new Date() }]);
+        setMessages(prev => [...prev, { id: 'err', role: 'model', text: profile.language === 'te' ? "క్షమించాలి, మళ్ళీ ప్రయత్నించండి." : "Issue connecting. Please retry.", timestamp: new Date() }]);
     } finally {
         setIsLoading(false);
         setResearchStatus('');
@@ -197,16 +197,13 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                         </div>
                         <span className="text-[9px] text-indigo-700 font-bold uppercase tracking-widest italic">Researching...</span>
                     </div>
-                    {researchStatus && <p className="text-[9px] text-slate-400 font-medium uppercase">{researchStatus}</p>}
                  </div>
             </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Questions & Input Bar */}
       <div className="bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-        {/* Suggestions Row */}
         <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
             <div className="flex items-center gap-1.5 shrink-0 text-indigo-600">
                 <Sparkles size={14} className="animate-pulse" />

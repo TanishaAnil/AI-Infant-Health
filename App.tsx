@@ -25,7 +25,6 @@ const App: React.FC = () => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmIntervalRef = useRef<number | null>(null);
 
-  // Alarm Sound Logic
   const stopAlarmSound = () => {
     if (alarmIntervalRef.current) {
       window.clearInterval(alarmIntervalRef.current);
@@ -61,7 +60,6 @@ const App: React.FC = () => {
     alarmIntervalRef.current = window.setInterval(playBeep, 1000);
   };
 
-  // Check for danger thresholds
   useEffect(() => {
     if (logs.length === 0) return;
     const latest = logs[0];
@@ -122,7 +120,6 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
-      {/* Danger Alert Banner */}
       {isAlarmActive && (
         <div className="bg-rose-600 text-white p-3 flex items-center justify-between animate-pulse z-50">
           <div className="flex items-center gap-2">
@@ -153,7 +150,7 @@ const App: React.FC = () => {
                 <div className="mb-6 bg-gradient-to-br from-indigo-600 to-indigo-800 p-5 rounded-3xl text-white shadow-xl animate-fade-in border border-white/10">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="bg-white/20 p-1.5 rounded-lg"><Activity size={16} /></div>
-                    <h3 className="font-bold text-sm tracking-wide italic">AI Health Insight</h3>
+                    <h3 className="font-bold text-sm tracking-wide italic">Daily Insight</h3>
                   </div>
                   <p className="text-xs leading-relaxed font-medium opacity-95">{dailyDigest}</p>
                 </div>

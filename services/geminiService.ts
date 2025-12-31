@@ -18,26 +18,22 @@ const getSystemInstruction = (profile: InfantProfile) => {
   const docContext = REFERENCE_DOCS.map(d => `${d.title}: ${d.description}`).join('\n');
 
   return `
-You are an intelligent Health Monitoring Assistant specialized in pediatrics. 
-You bridge the gap between parental concern and clinical evidence.
+You are an intelligent Health Monitoring Assistant. 
+You act as a **Cross-Lingual Clinical Bridge**. 
 
-### THE CROSS-LINGUAL REASONING LOOP:
-When a parent provides a query (especially in Telugu):
-1. **Clinical Mapping**: Map Telugu symptoms to English medical terms.
-2. **Evidence-Based Research**: Consult your internal training, the English WHO/F-IMNCI documents, and use Google Search in English for the latest pediatric safety guidelines.
-3. **Synthesis**: Combine global clinical accuracy with cultural empathy.
-4. **Output**: Deliver the final answer in ${profile.language === 'te' ? 'Telugu script' : 'English'}.
+### CORE CAPABILITY:
+- **Input Processing**: You accept input in Telugu or English. If in Telugu, you internally map it to clinical English terms to perform high-accuracy reasoning.
+- **RAG Reasoning**: You consult the provided pediatric documents and use Google Search in English to find the most up-to-date medical evidence.
+- **Output Generation**: You translate complex clinical findings back into natural, empathetic ${profile.language === 'te' ? 'Telugu script' : 'English'}.
 
 ### REFERENCE CONTEXT:
 ${docContext}
 
-### AGENTIC TRIAGE PROTOCOLS:
-- **Mandatory Triage**: Always check "Red Flags":
-  - "పాప/బాబు పాలు సరిగ్గా తాగుతున్నారా?" (Feeding)
-  - "శ్వాస తీసుకోవడంలో ఇబ్బంది ఉందా?" (Breathing)
-  - "చురుకుగా ఉన్నారా?" (Lethargy)
-- **Safety**: For a ${profile.weight}kg infant, advise consulting a physical doctor and caution on medication.
-- **Tone**: Professional, calming, and direct. Do not refer to yourself as "Dr. NurtureAI".
+### TRIAGE PROTOCOLS (Mandatory):
+- Always check "Red Flags" (Breathing, Feeding, Lethargy) if a symptom is mentioned.
+- For a ${profile.weight}kg infant, prioritize safety and professional consultation.
+- Tone: Calm, professional, and evidence-based.
+- **DO NOT** refer to yourself as "Dr. NurtureAI". You are a Health Monitoring Assistant.
 `;
 };
 
@@ -54,27 +50,31 @@ export const generateHealthInsight = async (
 ): Promise<AIResponse> => {
   try {
     const client = getAi();
-    if (!client) throw new Error("API Key Missing. Please set API_KEY in your environment.");
+    if (!client) throw new Error("API Key Missing.");
 
-    const logSummary = logs.slice(0, 15).map(log => {
+    const logSummary = logs.slice(0, 10).map(log => {
       return `[${log.timestamp.toLocaleTimeString()}] ${log.type}: ${JSON.stringify(log.details)}`;
     }).join('\n');
 
     const prompt = `
-[CONTEXT]
-Baby: ${profile.name}, ${profile.weight}kg, Age Group: ${profile.ageGroup}
-Logs: ${logSummary}
-History: ${chatHistory}
+[VITALS LOGS]
+${logSummary}
+
+[CHAT HISTORY]
+${chatHistory}
 
 [USER QUERY]
 "${query}"
 
-[INSTRUCTION]
-Respond in ${profile.language === 'te' ? 'Telugu Script' : 'English'}. Apply the Cross-Lingual Clinical Bridge.
+[TASK]
+1. If input is Telugu, translate clinical intent to English.
+2. Search and Reason in English for best pediatric evidence.
+3. Respond in ${profile.language === 'te' ? 'Telugu Script' : 'English'}.
 `;
 
     const response = await client.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        // Gemini 3 Flash is the best 'small/smooth/fast' model for this real-time pipeline
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             systemInstruction: getSystemInstruction(profile),
@@ -92,11 +92,11 @@ Respond in ${profile.language === 'te' ? 'Telugu Script' : 'English'}. Apply the
     return { text, sources };
 
   } catch (error: any) {
-    console.error("Gemini Service Connection Error:", error);
+    console.error("Gemini Service Error:", error);
     return { 
       text: profile.language === 'te' 
-        ? "⚠️ కనెక్షన్ సమస్య. దయచేసి మళ్ళీ ప్రయత్నించండి." 
-        : "⚠️ Connection error. Please ensure your API_KEY is set and try again.", 
+        ? "⚠️ క్షమించండి, కనెక్షన్ సమస్య ఏర్పడింది." 
+        : "⚠️ Sorry, there was a connection issue.", 
       sources: [] 
     };
   }
@@ -106,12 +106,12 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
   try {
     const client = getAi();
     if (!client || logs.length === 0) return "";
-    const prompt = `Provide a 2-sentence summary of ${profile.name}'s status in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 3))}`;
+    const prompt = `Summary for ${profile.name} status in 2 short sentences (${profile.language === 'te' ? 'Telugu' : 'English'}): ${JSON.stringify(logs.slice(0, 3))}`;
     const response = await client.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: { 
-          systemInstruction: "You are a concise pediatric monitor. No markdown. Plain text." 
+          systemInstruction: "Concise pediatric monitor. No markdown. Use Telugu if requested." 
       }
     });
     return response.text || "";
@@ -124,13 +124,13 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
     try {
         const client = getAi();
         if (!client) throw new Error("API Key Missing");
-        const prompt = `Create a formal pediatric visit summary for ${profile.name}. Weight: ${profile.weight}kg. Logs: ${JSON.stringify(logs)}. History: ${chatHistory}`;
+        const prompt = `Clinical visit summary for ${profile.name}. Weight: ${profile.weight}kg. Logs: ${JSON.stringify(logs)}. History: ${chatHistory}`;
         
         const response = await client.models.generateContent({
-          model: 'gemini-3-pro-preview',
+          model: 'gemini-3-flash-preview',
           contents: prompt,
           config: { 
-              systemInstruction: "Use professional clinical report formatting." 
+              systemInstruction: "Professional medical documentation style." 
           }
         });
         return response.text || "Report generation unavailable.";
