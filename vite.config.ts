@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Robustly polyfill process.env.API_KEY for the browser
+      // Ensures process.env.API_KEY is available in the browser context
       'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || "")
     }
   };
