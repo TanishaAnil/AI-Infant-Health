@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen, Sparkles, RefreshCcw } from 'lucide-react';
 import { ChatMessage, LogEntry, InfantProfile } from '../types';
 import { generateHealthInsight } from '../services/geminiService';
+import { GoogleGenAI } from "@google/genai";
 
 interface AgentChatProps {
   logs: LogEntry[];
@@ -10,20 +11,18 @@ interface AgentChatProps {
   onUpdateHistory: (msgs: ChatMessage[]) => void;
 }
 
-const SUGGESTIONS = {
+const DEFAULT_SUGGESTIONS = {
   en: [
     "Check breathing pattern",
     "How to manage fever?",
     "Feeding frequency guide",
-    "Sleep safety tips",
-    "When to visit doctor?"
+    "Sleep safety tips"
   ],
   te: [
     "శ్వాస తీరును తనిఖీ చేయండి",
     "జ్వరాన్ని ఎలా తగ్గించాలి?",
     "ఆహారం ఇచ్చే సమయాలు",
-    "నిద్ర భద్రతా చిట్కాలు",
-    "డాక్టరును ఎప్పుడు కలవాలి?"
+    "నిద్ర భద్రతా చిట్కాలు"
   ]
 };
 
@@ -62,6 +61,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
       timestamp: new Date()
     }
   ]);
+  const [suggestions, setSuggestions] = useState<string[]>(profile.language === 'te' ? DEFAULT_SUGGESTIONS.te : DEFAULT_SUGGESTIONS.en);
+  const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [sourcesMap, setSourcesMap] = useState<Record<string, {title: string, uri: string}[]>>({});
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -75,6 +76,41 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(scrollToBottom, [messages, isLoading]);
   useEffect(() => { onUpdateHistory(messages); }, [messages, onUpdateHistory]);
+
+  const updateDynamicSuggestions = async (currentMessages: ChatMessage[]) => {
+    setIsGeneratingSuggestions(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const lastContext = currentMessages.slice(-3).map(m => `${m.role}: ${m.text}`).join('\n');
+      const latestLogs = JSON.stringify(logs.slice(0, 3));
+      
+      const prompt = `Based on the chat history and baby vitals below, suggest 4 short follow-up questions the parent might want to ask. 
+      Output ONLY the questions as a JSON string array. 
+      Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.
+      
+      Context:
+      ${lastContext}
+      Vitals: ${latestLogs}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: { 
+            responseMimeType: "application/json",
+            temperature: 0.7 
+        }
+      });
+      
+      const suggestedArray = JSON.parse(response.text || "[]");
+      if (Array.isArray(suggestedArray) && suggestedArray.length > 0) {
+        setSuggestions(suggestedArray);
+      }
+    } catch (e) {
+      console.error("Failed to update suggestions", e);
+    } finally {
+      setIsGeneratingSuggestions(false);
+    }
+  };
 
   const toggleListening = () => {
     if (isListening) {
@@ -114,18 +150,23 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     if (!textToSend.trim() || isLoading) return;
 
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: textToSend, timestamp: new Date() };
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInput('');
     setIsLoading(true);
     setResearchStatus(profile.language === 'te' ? 'పరిశీలిస్తున్నాను...' : 'Processing...');
 
-    const history = messages.slice(-5).map(m => `${m.role}: ${m.text}`).join('\n');
+    const history = updatedMessages.slice(-5).map(m => `${m.role}: ${m.text}`).join('\n');
 
     try {
         const { text, sources } = await generateHealthInsight(logs, textToSend, profile, history);
         const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: text, timestamp: new Date() };
-        setMessages(prev => [...prev, aiMsg]);
+        const finalMessages = [...updatedMessages, aiMsg];
+        setMessages(finalMessages);
         if (sources.length > 0) setSourcesMap(prev => ({ ...prev, [aiMsg.id]: sources }));
+        
+        // Trigger dynamic suggestions update
+        updateDynamicSuggestions(finalMessages);
     } catch (e) {
         setMessages(prev => [...prev, { id: 'err', role: 'model', text: profile.language === 'te' ? "క్షమించాలి, మళ్ళీ ప్రయత్నించండి." : "Issue connecting. Please retry.", timestamp: new Date() }]);
     } finally {
@@ -204,11 +245,12 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
       </div>
 
       <div className="bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+        {/* Dynamic Suggestions Row */}
         <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
             <div className="flex items-center gap-1.5 shrink-0 text-indigo-600">
-                <Sparkles size={14} className="animate-pulse" />
+                <Sparkles size={14} className={isGeneratingSuggestions ? 'animate-spin' : 'animate-pulse'} />
             </div>
-            {(profile.language === 'te' ? SUGGESTIONS.te : SUGGESTIONS.en).map((text, i) => (
+            {suggestions.map((text, i) => (
                 <button 
                     key={i} 
                     onClick={() => handleSend(text)}
@@ -217,6 +259,11 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                     {text}
                 </button>
             ))}
+            {isGeneratingSuggestions && (
+                <div className="flex items-center gap-1 ml-2">
+                    <RefreshCcw size={10} className="animate-spin text-slate-300" />
+                </div>
+            )}
         </div>
 
         <div className="p-4 flex items-center gap-2">
