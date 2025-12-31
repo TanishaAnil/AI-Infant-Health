@@ -2,8 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen, Sparkles, RefreshCcw } from 'lucide-react';
 import { ChatMessage, LogEntry, InfantProfile } from '../types';
-import { generateHealthInsight } from '../services/geminiService';
-import { GoogleGenAI } from "@google/genai";
+import { generateHealthInsight, generateDynamicSuggestions } from '../services/geminiService';
 
 interface AgentChatProps {
   logs: LogEntry[];
@@ -79,37 +78,12 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
 
   const updateDynamicSuggestions = async (currentMessages: ChatMessage[]) => {
     setIsGeneratingSuggestions(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-      const lastContext = currentMessages.slice(-3).map(m => `${m.role}: ${m.text}`).join('\n');
-      const latestLogs = JSON.stringify(logs.slice(0, 3));
-      
-      const prompt = `Based on the chat history and baby vitals below, suggest 4 short follow-up questions the parent might want to ask. 
-      Output ONLY the questions as a JSON string array. 
-      Language: ${profile.language === 'te' ? 'Telugu' : 'English'}.
-      
-      Context:
-      ${lastContext}
-      Vitals: ${latestLogs}`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: { 
-            responseMimeType: "application/json",
-            temperature: 0.7 
-        }
-      });
-      
-      const suggestedArray = JSON.parse(response.text || "[]");
-      if (Array.isArray(suggestedArray) && suggestedArray.length > 0) {
-        setSuggestions(suggestedArray);
-      }
-    } catch (e) {
-      console.error("Failed to update suggestions", e);
-    } finally {
-      setIsGeneratingSuggestions(false);
+    const lastContext = currentMessages.slice(-4).map(m => `${m.role}: ${m.text}`).join('\n');
+    const newSuggestions = await generateDynamicSuggestions(lastContext, logs, profile.language);
+    if (newSuggestions.length > 0) {
+      setSuggestions(newSuggestions);
     }
+    setIsGeneratingSuggestions(false);
   };
 
   const toggleListening = () => {
@@ -165,7 +139,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         setMessages(finalMessages);
         if (sources.length > 0) setSourcesMap(prev => ({ ...prev, [aiMsg.id]: sources }));
         
-        // Trigger dynamic suggestions update
+        // Trigger suggestions refresh based on new context
         updateDynamicSuggestions(finalMessages);
     } catch (e) {
         setMessages(prev => [...prev, { id: 'err', role: 'model', text: profile.language === 'te' ? "క్షమించాలి, మళ్ళీ ప్రయత్నించండి." : "Issue connecting. Please retry.", timestamp: new Date() }]);
@@ -238,6 +212,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                         </div>
                         <span className="text-[9px] text-indigo-700 font-bold uppercase tracking-widest italic">Researching...</span>
                     </div>
+                    {researchStatus && <p className="text-[9px] text-slate-400 font-medium uppercase px-1">{researchStatus}</p>}
                  </div>
             </div>
         )}
@@ -254,7 +229,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                 <button 
                     key={i} 
                     onClick={() => handleSend(text)}
-                    className="shrink-0 px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full hover:bg-indigo-100 transition-colors active:scale-95"
+                    className="shrink-0 px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full hover:bg-indigo-100 transition-colors active:scale-95 whitespace-nowrap"
                 >
                     {text}
                 </button>
