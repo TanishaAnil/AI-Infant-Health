@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen } from 'lucide-react';
+import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen, Sparkles } from 'lucide-react';
 import { ChatMessage, LogEntry, InfantProfile } from '../types';
 import { generateHealthInsight } from '../services/geminiService';
 
@@ -9,6 +9,23 @@ interface AgentChatProps {
   profile: InfantProfile;
   onUpdateHistory: (msgs: ChatMessage[]) => void;
 }
+
+const SUGGESTIONS = {
+  en: [
+    "Check breathing pattern",
+    "How to manage fever?",
+    "Feeding frequency guide",
+    "Sleep safety tips",
+    "When to visit doctor?"
+  ],
+  te: [
+    "శ్వాస తీరును తనిఖీ చేయండి",
+    "జ్వరాన్ని ఎలా తగ్గించాలి?",
+    "ఆహారం ఇచ్చే సమయాలు",
+    "నిద్ర భద్రతా చిట్కాలు",
+    "డాక్టరును ఎప్పుడు కలవాలి?"
+  ]
+};
 
 const formatText = (text: string) => {
   const lines = text.split('\n');
@@ -40,8 +57,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
       id: 'welcome',
       role: 'model',
       text: profile.language === 'te' 
-        ? `నమస్కారం ${profile.parentName}. నేను డాక్టర్ NurtureAI. ${profile.name} ఆరోగ్యం గురించి ఏవైనా సందేహాలు ఉన్నాయా?`
-        : `Hello ${profile.parentName}. I am Dr. NurtureAI. Do you have any concerns about ${profile.name}'s health?`,
+        ? `నమస్కారం ${profile.parentName}. నేను మీ సహాయకుడిని. ${profile.name} ఆరోగ్యం గురించి ఏదైనా అడగండి.`
+        : `Hello ${profile.parentName}. I am your health assistant. How can I help with ${profile.name}'s care today?`,
       timestamp: new Date()
     }
   ]);
@@ -85,41 +102,32 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.replace(/[*#]/g, ''));
-    
-    if (profile.language === 'te') {
-        utterance.lang = 'te-IN';
-        const voices = window.speechSynthesis.getVoices();
-        // Prefer a Telugu voice if available on the system
-        const teluguVoice = voices.find(v => v.lang.includes('te'));
-        if (teluguVoice) utterance.voice = teluguVoice;
-    } else {
-        utterance.lang = 'en-US';
-    }
-
-    utterance.rate = 0.92;
+    utterance.lang = profile.language === 'te' ? 'te-IN' : 'en-US';
+    utterance.rate = 0.95;
     utterance.onstart = () => setSpeakingId(id);
     utterance.onend = () => setSpeakingId(null);
     window.speechSynthesis.speak(utterance);
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (overrideInput?: string) => {
+    const textToSend = overrideInput || input;
+    if (!textToSend.trim() || isLoading) return;
 
-    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: input, timestamp: new Date() };
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: textToSend, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
-    setResearchStatus(profile.language === 'te' ? 'వైద్య పత్రాలు మరియు గూగుల్ సెర్చ్ పరిశీలిస్తున్నాను...' : 'Analyzing documents and searching Google...');
+    setResearchStatus(profile.language === 'te' ? 'విశ్లేషిస్తున్నాను...' : 'Analyzing vitals and documentation...');
 
     const history = messages.slice(-5).map(m => `${m.role}: ${m.text}`).join('\n');
 
     try {
-        const { text, sources } = await generateHealthInsight(logs, userMsg.text, profile, history);
+        const { text, sources } = await generateHealthInsight(logs, textToSend, profile, history);
         const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: text, timestamp: new Date() };
         setMessages(prev => [...prev, aiMsg]);
         if (sources.length > 0) setSourcesMap(prev => ({ ...prev, [aiMsg.id]: sources }));
     } catch (e) {
-        setMessages(prev => [...prev, { id: 'err', role: 'model', text: profile.language === 'te' ? "క్షమించాలి, సమాచారం పొందడంలో ఇబ్బందిగా ఉంది." : "Sorry, I'm having trouble connecting right now.", timestamp: new Date() }]);
+        setMessages(prev => [...prev, { id: 'err', role: 'model', text: profile.language === 'te' ? "క్షమించాలి, మళ్ళీ ప్రయత్నించండి." : "Connection issue. Please retry.", timestamp: new Date() }]);
     } finally {
         setIsLoading(false);
         setResearchStatus('');
@@ -128,16 +136,16 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
 
   return (
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
-      <div className="px-4 py-3 bg-indigo-600 border-b border-indigo-700 flex items-center justify-between text-white shadow-lg z-10">
+      <div className="px-4 py-3 bg-indigo-700 border-b border-indigo-800 flex items-center justify-between text-white shadow-md z-10">
          <div className="flex items-center gap-2">
-            <div className="bg-white/20 p-1.5 rounded-lg animate-pulse">
+            <div className="bg-white/20 p-1.5 rounded-lg">
                 <Bot size={18} />
             </div>
             <span className="text-xs font-black uppercase tracking-widest">
-                {profile.language === 'te' ? 'AI డాక్టర్ అందుబాటులో ఉన్నారు' : 'Dr. NurtureAI Agent'}
+                {profile.language === 'te' ? 'సహాయకుడు' : 'Assistant'}
             </span>
          </div>
-         <div className="flex gap-4 opacity-80">
+         <div className="flex gap-4 opacity-70">
              <BookOpen size={16} />
              <Search size={16} />
          </div>
@@ -147,7 +155,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
             <div className={`flex max-w-[92%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-2`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-emerald-600 border border-emerald-100'}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`}>
                     {msg.role === 'user' ? <User size={14} /> : <Bot size={16} />}
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -158,8 +166,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                     {sourcesMap[msg.id] && (
                         <div className="mt-1 flex flex-wrap gap-2">
                              {sourcesMap[msg.id].map((src, idx) => (
-                                <a key={idx} href={src.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-full hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm">
-                                    <ExternalLink size={10} /> {src.title.slice(0, 25)}...
+                                <a key={idx} href={src.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[9px] bg-white border border-slate-200 text-slate-500 px-3 py-1 rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+                                    <ExternalLink size={8} /> {src.title.slice(0, 20)}
                                 </a>
                              ))}
                         </div>
@@ -168,7 +176,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                     {msg.role === 'model' && (
                         <button 
                             onClick={() => handleSpeak(msg.id, msg.text)} 
-                            className={`flex items-center gap-2 self-start text-[10px] font-bold px-4 py-2 rounded-full mt-1 border transition-all ${speakingId === msg.id ? 'bg-rose-500 text-white border-rose-600 shadow-rose-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                            className={`flex items-center gap-2 self-start text-[10px] font-bold px-3 py-1.5 rounded-full mt-1 border transition-all ${speakingId === msg.id ? 'bg-rose-500 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-200'}`}
                         >
                             {speakingId === msg.id ? <Square size={10} fill="currentColor" /> : <Volume2 size={12} />}
                             {speakingId === msg.id ? (profile.language === 'te' ? 'ఆపు' : 'Stop') : (profile.language === 'te' ? 'వినండి' : 'Listen')}
@@ -180,27 +188,44 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         ))}
         {isLoading && (
             <div className="flex justify-start animate-fade-in">
-                 <div className="flex flex-col gap-2 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-[85%]">
-                    <div className="flex items-center gap-3">
+                 <div className="flex flex-col gap-2 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-[85%]">
+                    <div className="flex items-center gap-2">
                         <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                            <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                            <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                            <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
+                            <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                            <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
                         </div>
-                        <span className="text-[10px] text-indigo-700 font-black uppercase tracking-widest italic">Reasoning...</span>
+                        <span className="text-[9px] text-indigo-700 font-bold uppercase tracking-widest italic">Researching...</span>
                     </div>
-                    {researchStatus && <p className="text-[10px] text-slate-400 font-bold leading-tight uppercase tracking-tighter">{researchStatus}</p>}
+                    {researchStatus && <p className="text-[9px] text-slate-400 font-medium uppercase">{researchStatus}</p>}
                  </div>
             </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
-        <div className="flex items-center gap-2">
+      {/* Suggested Questions & Input Bar */}
+      <div className="bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+        {/* Suggestions Row */}
+        <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+            <div className="flex items-center gap-1.5 shrink-0 text-indigo-600">
+                <Sparkles size={14} className="animate-pulse" />
+            </div>
+            {(profile.language === 'te' ? SUGGESTIONS.te : SUGGESTIONS.en).map((text, i) => (
+                <button 
+                    key={i} 
+                    onClick={() => handleSend(text)}
+                    className="shrink-0 px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full hover:bg-indigo-100 transition-colors active:scale-95"
+                >
+                    {text}
+                </button>
+            ))}
+        </div>
+
+        <div className="p-4 flex items-center gap-2">
           <button 
             onClick={toggleListening} 
-            className={`p-4 rounded-2xl transition-all shadow-md ${isListening ? 'bg-rose-500 text-white animate-pulse shadow-rose-200 scale-110' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+            className={`p-4 rounded-2xl transition-all shadow-sm ${isListening ? 'bg-rose-500 text-white animate-pulse' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
           >
             {isListening ? <MicOff size={22} /> : <Mic size={22} />}
           </button>
@@ -209,13 +234,13 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={profile.language === 'te' ? 'సందేహాన్ని ఇక్కడ టైప్ చేయండి...' : "Ask a pediatric concern..."}
-            className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm shadow-inner"
+            placeholder={profile.language === 'te' ? 'ఇక్కడ అడగండి...' : "Ask anything about baby care..."}
+            className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
           />
           <button 
             onClick={() => handleSend()} 
             disabled={isLoading || !input.trim()} 
-            className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100 disabled:opacity-50 active:scale-90 transition-all"
+            className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg disabled:opacity-50 active:scale-90 transition-all"
           >
             <Send size={22} />
           </button>
