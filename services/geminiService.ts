@@ -34,9 +34,8 @@ export const generateHealthInsight = async (
   chatHistory: string
 ): Promise<AIResponse> => {
   try {
-    const apiKey = process.env.API_KEY;
-    // We create a new instance here to ensure it uses the latest key if it was changed via openSelectKey
-    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    // Re-initialize with latest API key from environment
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     
     const logSummary = logs.slice(0, 8).map(log => {
       const time = new Date(log.timestamp).toLocaleTimeString();
@@ -62,8 +61,8 @@ ${chatHistory.slice(-1000)}
 `;
 
     const response = await ai.models.generateContent({
-        // Using Pro for complex health reasoning
-        model: 'gemini-3-pro-preview',
+        // 'gemini-3-flash-preview' is the most stable and generous model for the Free Tier
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             systemInstruction: getSystemInstruction(profile),
@@ -81,21 +80,23 @@ ${chatHistory.slice(-1000)}
 
   } catch (error: any) {
     console.error("Gemini Health Insight Error:", error);
-    // Return specific error message for debugging
-    const errorMessage = error?.message || "Unknown error";
+    const errorMessage = error?.message || "Unknown connection error";
     const isTe = profile.language === 'te';
     
-    if (errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("entity was not found")) {
-       return {
-         text: isTe ? "⚠️ API కీ చెల్లదు. దయచేసి కనెక్షన్‌ని మళ్ళీ సెట్ చేయండి." : "⚠️ Invalid API Key or access denied. Please re-configure your connection.",
-         sources: []
-       };
+    // Specifically handle 429 Quota errors for Free Tier
+    if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
+      return {
+        text: isTe 
+          ? "⚠️ ఉచిత పరిమితి (Free Limit) ముగిసింది. దయచేసి కొన్ని సెకన్లు ఆగి మళ్ళీ ప్రయత్నించండి." 
+          : "⚠️ Free Tier Limit Reached. Please wait a few seconds and try your request again.",
+        sources: []
+      };
     }
 
     return { 
       text: isTe 
-        ? `⚠️ కనెక్షన్ ఇబ్బంది: ${errorMessage}. దయచేసి మళ్ళీ ప్రయత్నించండి.` 
-        : `⚠️ Connection error: ${errorMessage}. Please try your request again.`, 
+        ? `⚠️ కనెక్షన్ ఇబ్బంది: ${errorMessage}.` 
+        : `⚠️ Connection error: ${errorMessage}. Please try again.`, 
       sources: [] 
     };
   }
@@ -103,8 +104,7 @@ ${chatHistory.slice(-1000)}
 
 export const generateDynamicSuggestions = async (history: string, logs: LogEntry[], language: 'en' | 'te'): Promise<string[]> => {
   try {
-    const apiKey = process.env.API_KEY;
-    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const latestLogs = logs.slice(0, 2).map(l => l.type).join(', ');
     
     const prompt = `Suggest 4 short follow-up questions for a parent based on:
@@ -136,8 +136,7 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
 
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
-    const apiKey = process.env.API_KEY;
-    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const prompt = `Summarize ${profile.name}'s status briefly in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 2))}`;
     
     const response = await ai.models.generateContent({
@@ -153,8 +152,7 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 
 export const generateFormalReport = async (logs: LogEntry[], profile: InfantProfile, chatHistory: string): Promise<string> => {
     try {
-        const apiKey = process.env.API_KEY;
-        const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
         const prompt = `Clinical report for ${profile.name}. Logs: ${JSON.stringify(logs.slice(0, 20))}.`;
         
         const response = await ai.models.generateContent({

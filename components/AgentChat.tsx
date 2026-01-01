@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen, Sparkles, RefreshCcw, Key, AlertCircle } from 'lucide-react';
+import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen, Sparkles, RefreshCcw, Key, AlertCircle, Info } from 'lucide-react';
 import { ChatMessage, LogEntry, InfantProfile } from '../types';
 import { generateHealthInsight, generateDynamicSuggestions } from '../services/geminiService';
 
@@ -67,11 +67,25 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
   useEffect(() => { onUpdateHistory(messages); }, [messages, onUpdateHistory]);
 
   const handleFixConnection = async () => {
-    if ((window as any).aistudio?.openSelectKey) {
-        await (window as any).aistudio.openSelectKey();
-        setHasConnectionIssue(false);
+    const aistudio = (window as any).aistudio;
+    if (aistudio?.openSelectKey) {
+        try {
+            await aistudio.openSelectKey();
+            setHasConnectionIssue(false);
+            const successMsg: ChatMessage = {
+                id: 'key-update-' + Date.now(),
+                role: 'model',
+                text: profile.language === 'te' 
+                  ? "కనెక్షన్ పునరుద్ధరించబడింది. దయచేసి మళ్ళీ ప్రయత్నించండి." 
+                  : "Connection refreshed. Please try your request again.",
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, successMsg]);
+        } catch (err) {
+            console.error("Failed to refresh connection", err);
+        }
     } else {
-        alert("Please ensure your API Key is set in the environment.");
+        alert("Refresh is only available in the AI Studio environment.");
     }
   };
 
@@ -117,7 +131,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         setMessages(prev => [...prev, { 
             id: 'err', 
             role: 'model', 
-            text: profile.language === 'te' ? "క్షమించాలి, కనెక్షన్ సమస్య ఉంది." : "Sorry, there was a connection issue.", 
+            text: profile.language === 'te' ? "క్షమించాలి, ఉచిత పరిమితి (Quota) సమస్య ఉంది." : "Sorry, there was a free tier quota or connection issue.", 
             timestamp: new Date() 
         }]);
     } finally {
@@ -168,7 +182,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
             </span>
          </div>
          <button onClick={handleFixConnection} className="flex items-center gap-1 text-[10px] bg-white/10 px-2 py-1 rounded-md hover:bg-white/20 transition-all">
-             <Key size={12} /> {profile.language === 'te' ? 'కీ సెట్ చేయండి' : 'Set Key'}
+             <RefreshCcw size={12} /> {profile.language === 'te' ? 'రీఫ్రెష్' : 'Refresh'}
          </button>
       </div>
 
@@ -208,20 +222,23 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
             <div className="flex justify-start animate-fade-in">
                  <div className="flex items-center gap-2 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <RefreshCcw size={14} className="animate-spin text-indigo-600" />
-                    <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-widest italic">Researching...</span>
+                    <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-widest italic">Analyzing...</span>
                  </div>
             </div>
         )}
         {hasConnectionIssue && (
-             <div className="flex flex-col items-center gap-3 p-6 bg-rose-50 border border-rose-100 rounded-2xl text-rose-700 text-center animate-fade-in mx-4">
-                <AlertCircle size={32} className="text-rose-500" />
+             <div className="flex flex-col items-center gap-3 p-6 bg-slate-50 border border-slate-100 rounded-2xl text-slate-700 text-center animate-fade-in mx-4">
+                <AlertCircle size={32} className="text-indigo-500" />
                 <div className="space-y-1">
-                    <p className="font-bold text-sm">Connection Unstable</p>
-                    <p className="text-xs opacity-80">This usually happens due to an invalid or restricted API key.</p>
+                    <p className="font-bold text-sm">Free Tier Limit / Connection Issue</p>
+                    <p className="text-xs opacity-80">This usually happens when too many requests are sent quickly on a free plan. Please wait 15-30 seconds.</p>
                 </div>
-                <button onClick={handleFixConnection} className="w-full py-3 bg-rose-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-200 active:scale-95 transition-all">
-                    <Key size={18} /> Fix Connection
-                </button>
+                <div className="flex flex-col gap-3 w-full">
+                  <button onClick={handleFixConnection} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 transition-all">
+                      <RefreshCcw size={18} /> Refresh Connection
+                  </button>
+                  <p className="text-[10px] text-slate-400">If errors persist, ensure your API key is linked to an active project in AI Studio.</p>
+                </div>
              </div>
         )}
         <div ref={messagesEndRef} />
