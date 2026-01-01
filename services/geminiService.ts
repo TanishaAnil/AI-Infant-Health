@@ -3,10 +3,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { LogEntry, InfantProfile } from "../types";
 import { REFERENCE_DOCS } from "./documents";
 
-/**
- * Optimized System Instruction for gemini-3-flash-preview
- * Focuses on high-speed translation and clinical accuracy.
- */
 const getSystemInstruction = (profile: InfantProfile) => {
   const docContext = REFERENCE_DOCS.map(d => `${d.title}: ${d.description}`).join('\n');
 
@@ -31,9 +27,6 @@ export interface AIResponse {
   sources: { title: string; uri: string }[];
 }
 
-/**
- * Main RAG and Translation Pipeline
- */
 export const generateHealthInsight = async (
   logs: LogEntry[], 
   query: string, 
@@ -42,13 +35,9 @@ export const generateHealthInsight = async (
 ): Promise<AIResponse> => {
   try {
     const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      throw new Error("API_KEY_MISSING");
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
+    // We create a new instance here to ensure it uses the latest key if it was changed via openSelectKey
+    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
     
-    // Format logs for context
     const logSummary = logs.slice(0, 8).map(log => {
       const time = new Date(log.timestamp).toLocaleTimeString();
       return `[${time}] ${log.type}: ${JSON.stringify(log.details)}`;
@@ -73,14 +62,13 @@ ${chatHistory.slice(-1000)}
 `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        // Using Pro for complex health reasoning
+        model: 'gemini-3-pro-preview',
         contents: prompt,
         config: {
             systemInstruction: getSystemInstruction(profile),
             tools: [{ googleSearch: {} }],
             temperature: 0.2,
-            topP: 0.8,
-            topK: 40
         }
     });
     
@@ -93,29 +81,34 @@ ${chatHistory.slice(-1000)}
 
   } catch (error: any) {
     console.error("Gemini Health Insight Error:", error);
+    // Return specific error message for debugging
+    const errorMessage = error?.message || "Unknown error";
     const isTe = profile.language === 'te';
+    
+    if (errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("entity was not found")) {
+       return {
+         text: isTe ? "⚠️ API కీ చెల్లదు. దయచేసి కనెక్షన్‌ని మళ్ళీ సెట్ చేయండి." : "⚠️ Invalid API Key or access denied. Please re-configure your connection.",
+         sources: []
+       };
+    }
+
     return { 
       text: isTe 
-        ? "⚠️ కనెక్షన్ ఇబ్బంది. దయచేసి మళ్ళీ ప్రయత్నించండి." 
-        : "⚠️ Connection error. Please try your request again in a moment.", 
+        ? `⚠️ కనెక్షన్ ఇబ్బంది: ${errorMessage}. దయచేసి మళ్ళీ ప్రయత్నించండి.` 
+        : `⚠️ Connection error: ${errorMessage}. Please try your request again.`, 
       sources: [] 
     };
   }
 };
 
-/**
- * Generates dynamic follow-up suggestions based on context
- */
 export const generateDynamicSuggestions = async (history: string, logs: LogEntry[], language: 'en' | 'te'): Promise<string[]> => {
   try {
     const apiKey = process.env.API_KEY;
-    if (!apiKey) return [];
-    
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
     const latestLogs = logs.slice(0, 2).map(l => l.type).join(', ');
     
-    const prompt = `Suggest 4 short follow-up questions a parent would ask next. 
-    Context: ${history.slice(-500)}
+    const prompt = `Suggest 4 short follow-up questions for a parent based on:
+    History: ${history.slice(-500)}
     Recent activity: ${latestLogs}`;
 
     const response = await ai.models.generateContent({
@@ -127,13 +120,12 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
             type: Type.ARRAY,
             items: { type: Type.STRING }
           },
-          systemInstruction: `Suggest relevant, brief questions in ${language === 'te' ? 'Telugu' : 'English'}. No long sentences.`
+          systemInstruction: `Suggest brief pediatric follow-up questions in ${language === 'te' ? 'Telugu' : 'English'}.`
       }
     });
     
     try {
-      const result = JSON.parse(response.text || "[]");
-      return Array.isArray(result) ? result : [];
+      return JSON.parse(response.text || "[]");
     } catch {
       return [];
     }
@@ -145,17 +137,13 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
     const apiKey = process.env.API_KEY;
-    if (!apiKey || logs.length === 0) return "";
-    
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
     const prompt = `Summarize ${profile.name}'s status briefly in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 2))}`;
     
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
-      config: { 
-          systemInstruction: "Pediatric summary agent. 2 sentences max. Plain text." 
-      }
+      config: { systemInstruction: "Pediatric summary agent." }
     });
     return response.text || "";
   } catch {
@@ -166,17 +154,13 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 export const generateFormalReport = async (logs: LogEntry[], profile: InfantProfile, chatHistory: string): Promise<string> => {
     try {
         const apiKey = process.env.API_KEY;
-        if (!apiKey) throw new Error("API Key Missing");
-        
-        const ai = new GoogleGenAI({ apiKey });
-        const prompt = `Generate a clinical report for ${profile.name}. Weight: ${profile.weight}kg. Recent: ${JSON.stringify(logs.slice(0, 20))}.`;
+        const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+        const prompt = `Clinical report for ${profile.name}. Logs: ${JSON.stringify(logs.slice(0, 20))}.`;
         
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: prompt,
-          config: { 
-              systemInstruction: "Generate a professional medical visit summary in English." 
-          }
+          config: { systemInstruction: "Professional medical summary." }
         });
         return response.text || "Report unavailable.";
       } catch {

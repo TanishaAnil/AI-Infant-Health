@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen, Sparkles, RefreshCcw } from 'lucide-react';
+import { Send, Bot, User, Mic, MicOff, Volume2, Square, ExternalLink, Search, BookOpen, Sparkles, RefreshCcw, Key, AlertCircle } from 'lucide-react';
 import { ChatMessage, LogEntry, InfantProfile } from '../types';
 import { generateHealthInsight, generateDynamicSuggestions } from '../services/geminiService';
 
@@ -11,18 +11,8 @@ interface AgentChatProps {
 }
 
 const DEFAULT_SUGGESTIONS = {
-  en: [
-    "Check breathing pattern",
-    "How to manage fever?",
-    "Feeding frequency guide",
-    "Sleep safety tips"
-  ],
-  te: [
-    "శ్వాస తీరును తనిఖీ చేయండి",
-    "జ్వరాన్ని ఎలా తగ్గించాలి?",
-    "ఆహారం ఇచ్చే సమయాలు",
-    "నిద్ర భద్రతా చిట్కాలు"
-  ]
+  en: ["Check breathing", "Managing fever", "Feeding guide", "Sleep safety"],
+  te: ["శ్వాస తనిఖీ", "జ్వరం నిర్వహణ", "ఆహార గైడ్", "నిద్ర భద్రత"]
 };
 
 const formatText = (text: string) => {
@@ -67,7 +57,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
-  const [researchStatus, setResearchStatus] = useState<string>('');
+  const [hasConnectionIssue, setHasConnectionIssue] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -76,14 +66,63 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
   useEffect(scrollToBottom, [messages, isLoading]);
   useEffect(() => { onUpdateHistory(messages); }, [messages, onUpdateHistory]);
 
+  const handleFixConnection = async () => {
+    if ((window as any).aistudio?.openSelectKey) {
+        await (window as any).aistudio.openSelectKey();
+        setHasConnectionIssue(false);
+    } else {
+        alert("Please ensure your API Key is set in the environment.");
+    }
+  };
+
   const updateDynamicSuggestions = async (currentMessages: ChatMessage[]) => {
     setIsGeneratingSuggestions(true);
     const lastContext = currentMessages.slice(-4).map(m => `${m.role}: ${m.text}`).join('\n');
     const newSuggestions = await generateDynamicSuggestions(lastContext, logs, profile.language);
-    if (newSuggestions.length > 0) {
+    if (newSuggestions && newSuggestions.length > 0) {
       setSuggestions(newSuggestions);
     }
     setIsGeneratingSuggestions(false);
+  };
+
+  const handleSend = async (overrideInput?: string) => {
+    const textToSend = overrideInput || input;
+    if (!textToSend.trim() || isLoading) return;
+
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: textToSend, timestamp: new Date() };
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setInput('');
+    setIsLoading(true);
+    setHasConnectionIssue(false);
+
+    const history = updatedMessages.slice(-5).map(m => `${m.role}: ${m.text}`).join('\n');
+
+    try {
+        const { text, sources } = await generateHealthInsight(logs, textToSend, profile, history);
+        
+        if (text.includes("⚠️")) {
+            setHasConnectionIssue(true);
+        }
+
+        const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: text, timestamp: new Date() };
+        const finalMessages = [...updatedMessages, aiMsg];
+        setMessages(finalMessages);
+        if (sources.length > 0) setSourcesMap(prev => ({ ...prev, [aiMsg.id]: sources }));
+        
+        updateDynamicSuggestions(finalMessages);
+    } catch (e: any) {
+        console.error(e);
+        setHasConnectionIssue(true);
+        setMessages(prev => [...prev, { 
+            id: 'err', 
+            role: 'model', 
+            text: profile.language === 'te' ? "క్షమించాలి, కనెక్షన్ సమస్య ఉంది." : "Sorry, there was a connection issue.", 
+            timestamp: new Date() 
+        }]);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const toggleListening = () => {
@@ -92,8 +131,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
       return;
     }
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert("Voice input not supported in this browser.");
-
+    if (!SpeechRecognition) return alert("Voice input not supported.");
     const recognition = new SpeechRecognition();
     recognition.lang = profile.language === 'te' ? 'te-IN' : 'en-US';
     recognition.onstart = () => setIsListening(true);
@@ -113,40 +151,9 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.replace(/[*#]/g, ''));
     utterance.lang = profile.language === 'te' ? 'te-IN' : 'en-US';
-    utterance.rate = 1.0;
     utterance.onstart = () => setSpeakingId(id);
     utterance.onend = () => setSpeakingId(null);
     window.speechSynthesis.speak(utterance);
-  };
-
-  const handleSend = async (overrideInput?: string) => {
-    const textToSend = overrideInput || input;
-    if (!textToSend.trim() || isLoading) return;
-
-    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: textToSend, timestamp: new Date() };
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
-    setInput('');
-    setIsLoading(true);
-    setResearchStatus(profile.language === 'te' ? 'పరిశీలిస్తున్నాను...' : 'Processing...');
-
-    const history = updatedMessages.slice(-5).map(m => `${m.role}: ${m.text}`).join('\n');
-
-    try {
-        const { text, sources } = await generateHealthInsight(logs, textToSend, profile, history);
-        const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: text, timestamp: new Date() };
-        const finalMessages = [...updatedMessages, aiMsg];
-        setMessages(finalMessages);
-        if (sources.length > 0) setSourcesMap(prev => ({ ...prev, [aiMsg.id]: sources }));
-        
-        // Trigger suggestions refresh based on new context
-        updateDynamicSuggestions(finalMessages);
-    } catch (e) {
-        setMessages(prev => [...prev, { id: 'err', role: 'model', text: profile.language === 'te' ? "క్షమించాలి, మళ్ళీ ప్రయత్నించండి." : "Issue connecting. Please retry.", timestamp: new Date() }]);
-    } finally {
-        setIsLoading(false);
-        setResearchStatus('');
-    }
   };
 
   return (
@@ -160,10 +167,9 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                 {profile.language === 'te' ? 'సహాయకుడు' : 'Assistant'}
             </span>
          </div>
-         <div className="flex gap-4 opacity-70">
-             <BookOpen size={16} />
-             <Search size={16} />
-         </div>
+         <button onClick={handleFixConnection} className="flex items-center gap-1 text-[10px] bg-white/10 px-2 py-1 rounded-md hover:bg-white/20 transition-all">
+             <Key size={12} /> {profile.language === 'te' ? 'కీ సెట్ చేయండి' : 'Set Key'}
+         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -182,19 +188,16 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
                         <div className="mt-1 flex flex-wrap gap-2">
                              {sourcesMap[msg.id].map((src, idx) => (
                                 <a key={idx} href={src.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[9px] bg-white border border-slate-200 text-slate-500 px-3 py-1 rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all">
-                                    <ExternalLink size={8} /> {src.title.slice(0, 20)}
+                                    <Search size={8} /> {src.title.slice(0, 30)}...
                                 </a>
                              ))}
                         </div>
                     )}
 
                     {msg.role === 'model' && (
-                        <button 
-                            onClick={() => handleSpeak(msg.id, msg.text)} 
-                            className={`flex items-center gap-2 self-start text-[10px] font-bold px-3 py-1.5 rounded-full mt-1 border transition-all ${speakingId === msg.id ? 'bg-rose-500 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-200'}`}
-                        >
+                        <button onClick={() => handleSpeak(msg.id, msg.text)} className={`flex items-center gap-2 self-start text-[10px] font-bold px-3 py-1.5 rounded-full mt-1 border transition-all ${speakingId === msg.id ? 'bg-rose-500 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-200'}`}>
                             {speakingId === msg.id ? <Square size={10} fill="currentColor" /> : <Volume2 size={12} />}
-                            {speakingId === msg.id ? (profile.language === 'te' ? 'ఆపు' : 'Stop') : (profile.language === 'te' ? 'వినండి' : 'Listen')}
+                            {speakingId === msg.id ? 'Stop' : 'Listen'}
                         </button>
                     )}
                 </div>
@@ -203,49 +206,39 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
         ))}
         {isLoading && (
             <div className="flex justify-start animate-fade-in">
-                 <div className="flex flex-col gap-2 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-[85%]">
-                    <div className="flex items-center gap-2">
-                        <div className="flex gap-1">
-                            <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
-                            <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                            <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                        </div>
-                        <span className="text-[9px] text-indigo-700 font-bold uppercase tracking-widest italic">Researching...</span>
-                    </div>
-                    {researchStatus && <p className="text-[9px] text-slate-400 font-medium uppercase px-1">{researchStatus}</p>}
+                 <div className="flex items-center gap-2 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <RefreshCcw size={14} className="animate-spin text-indigo-600" />
+                    <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-widest italic">Researching...</span>
                  </div>
             </div>
+        )}
+        {hasConnectionIssue && (
+             <div className="flex flex-col items-center gap-3 p-6 bg-rose-50 border border-rose-100 rounded-2xl text-rose-700 text-center animate-fade-in mx-4">
+                <AlertCircle size={32} className="text-rose-500" />
+                <div className="space-y-1">
+                    <p className="font-bold text-sm">Connection Unstable</p>
+                    <p className="text-xs opacity-80">This usually happens due to an invalid or restricted API key.</p>
+                </div>
+                <button onClick={handleFixConnection} className="w-full py-3 bg-rose-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-200 active:scale-95 transition-all">
+                    <Key size={18} /> Fix Connection
+                </button>
+             </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
       <div className="bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-        {/* Dynamic Suggestions Row */}
         <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
-            <div className="flex items-center gap-1.5 shrink-0 text-indigo-600">
-                <Sparkles size={14} className={isGeneratingSuggestions ? 'animate-spin' : 'animate-pulse'} />
-            </div>
+            <Sparkles size={14} className={`text-indigo-600 ${isGeneratingSuggestions ? 'animate-spin' : 'animate-pulse'}`} />
             {suggestions.map((text, i) => (
-                <button 
-                    key={i} 
-                    onClick={() => handleSend(text)}
-                    className="shrink-0 px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full hover:bg-indigo-100 transition-colors active:scale-95 whitespace-nowrap"
-                >
+                <button key={i} onClick={() => handleSend(text)} className="shrink-0 px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full hover:bg-indigo-100 transition-colors whitespace-nowrap">
                     {text}
                 </button>
             ))}
-            {isGeneratingSuggestions && (
-                <div className="flex items-center gap-1 ml-2">
-                    <RefreshCcw size={10} className="animate-spin text-slate-300" />
-                </div>
-            )}
         </div>
 
         <div className="p-4 flex items-center gap-2">
-          <button 
-            onClick={toggleListening} 
-            className={`p-4 rounded-2xl transition-all shadow-sm ${isListening ? 'bg-rose-500 text-white animate-pulse' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-          >
+          <button onClick={toggleListening} className={`p-4 rounded-2xl transition-all shadow-sm ${isListening ? 'bg-rose-500 text-white animate-pulse' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
             {isListening ? <MicOff size={22} /> : <Mic size={22} />}
           </button>
           <input
@@ -253,14 +246,10 @@ export const AgentChat: React.FC<AgentChatProps> = ({ logs, profile, onUpdateHis
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={profile.language === 'te' ? 'ఇక్కడ అడగండి...' : "Ask anything about baby care..."}
+            placeholder={profile.language === 'te' ? 'ఇక్కడ అడగండి...' : "Ask baby care question..."}
             className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
           />
-          <button 
-            onClick={() => handleSend()} 
-            disabled={isLoading || !input.trim()} 
-            className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg disabled:opacity-50 active:scale-90 transition-all"
-          >
+          <button onClick={() => handleSend()} disabled={isLoading || !input.trim()} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg disabled:opacity-50 active:scale-90 transition-all">
             <Send size={22} />
           </button>
         </div>
