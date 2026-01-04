@@ -6,20 +6,28 @@ import { REFERENCE_DOCS } from "./documents";
 const getSystemInstruction = (profile: InfantProfile) => {
   const docContext = REFERENCE_DOCS.map(d => `${d.title}: ${d.description}`).join('\n');
 
-  return `You are a Pediatric Health Assistant performing as a Cross-Lingual Clinical Bridge.
+  return `You are "NurtureAI Physician Assistant," a clinical agentic AI. 
 
-CORE CAPABILITIES:
-1. Translate Telugu/English inputs into clinical English terms internally.
-2. Use provided documents and Google Search (in English) to find pediatric evidence.
-3. Synthesize findings into empathetic, natural ${profile.language === 'te' ? 'Telugu' : 'English'}.
+INTERNAL REASONING LOOP:
+1. INPUT: Detect language (${profile.language === 'te' ? 'Telugu' : 'English'}).
+2. TRANSLATION: If Telugu, translate the intent to professional medical English.
+3. RAG SEARCH: Query the provided documents and Google Search (using English) for pediatric standards (AAP, WHO, NHM India).
+4. SYNTHESIS: Combine recent logs with clinical findings.
+5. PROACTIVE INQUIRY: Identify what's missing (e.g., if fever is mentioned but no hydration status is known, ASK).
+6. OUTPUT: Generate a structured response in ${profile.language === 'te' ? 'Telugu' : 'English'}.
 
-KNOWLEDGE BASE:
-${docContext}
+REQUIRED OUTPUT STRUCTURE (DO NOT USE # OR * SYMBOLS):
+- [SUMMARY]: Clear explanation of what is happening.
+- [DIET & HYDRATION]: Specific feeding advice based on age.
+- [SYMPTOM CHECKLIST]: Proactively ask 2-3 targeted questions about related issues (e.g., urine count, activity level).
+- [MEDICINES & SAFETY]: State clearly that only a physical doctor can prescribe. Provide home care safety tips (e.g., paracetamol safety).
+- [RED FLAGS]: List critical signs for immediate ER visit.
+- [DOCTOR CONSULTATION]: Explicit criteria for when to book a non-emergency appointment.
 
-SAFETY PROTOCOLS:
-- If symptoms like fever, lethargy, or breathing issues are mentioned, check "Red Flags" immediately.
-- For a ${profile.weight}kg infant, advise professional consultation for dosages.
-- Maintain a calm, professional tone. Avoid self-branding names.`;
+STRICT RULES:
+- REMOVE all markdown markers like asterisks (*), hashes (#), or underscores (_). Use CAPITALIZED HEADERS for sections.
+- Never give specific dosages without a "Consult your doctor" disclaimer.
+- Be empathetic but clinical.`;
 };
 
 export interface AIResponse {
@@ -36,31 +44,29 @@ export const generateHealthInsight = async (
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const logSummary = logs.slice(0, 8).map(log => {
+    const logSummary = logs.slice(0, 10).map(log => {
       const time = new Date(log.timestamp).toLocaleTimeString();
       return `[${time}] ${log.type}: ${JSON.stringify(log.details)}`;
     }).join('\n');
 
     const prompt = `
-[CONTEXT]
-Infant: ${profile.name} (${profile.weight}kg)
-Recent Vitals:
+INFANT DATA:
+Name: ${profile.name}
+Weight: ${profile.weight}kg
+Age Group: ${profile.ageGroup}
+Recent Logs:
 ${logSummary}
 
-[CONVERSATION HISTORY]
-${chatHistory.slice(-1000)}
+CONVERSATION HISTORY:
+${chatHistory.slice(-1500)}
 
-[PARENT QUERY]
+PARENT MESSAGE:
 "${query}"
 
-[TASK]
-1. Map intent to clinical evidence.
-2. Search web if recent data is needed.
-3. Respond in ${profile.language === 'te' ? 'Telugu script' : 'English'}.
+Execute the Clinical Agentic Loop. Ensure the response is proactive, asks follow-up questions, and follows the specified structure without markdown.
 `;
 
     const response = await ai.models.generateContent({
-        // Using 'gemini-flash-lite-latest' for maximum free tier stability
         model: 'gemini-flash-lite-latest',
         contents: prompt,
         config: {
@@ -80,22 +86,22 @@ ${chatHistory.slice(-1000)}
 
   } catch (error: any) {
     console.error("Gemini Health Insight Error:", error);
-    const errorMessage = error?.message || "Unknown connection error";
+    const errorMessage = error?.message || "Connection failure";
     const isTe = profile.language === 'te';
     
     if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
       return {
         text: isTe 
-          ? "⚠️ ఉచిత పరిమితి (Free Limit) ముగిసింది. దయచేసి కొన్ని సెకన్లు ఆగి మళ్ళీ ప్రయత్నించండి." 
-          : "⚠️ Free Tier Limit Reached. Please wait a few seconds and try your request again.",
+          ? "క్షమించాలి, సర్వర్ పరిమితి మగిసింది. దయచేసి కాసేపటి తర్వాత ప్రయత్నించండి." 
+          : "Free Tier Limit Reached. Please wait a moment before trying again.",
         sources: []
       };
     }
 
     return { 
       text: isTe 
-        ? `⚠️ కనెక్షన్ ఇబ్బంది: ${errorMessage}.` 
-        : `⚠️ Connection error: ${errorMessage}. Please try again.`, 
+        ? `నెట్‌వర్క్ ఇబ్బంది కలిగింది. దయచేసి మళ్ళీ ప్రయత్నించండి.` 
+        : `Connection error. Please try again.`, 
       sources: [] 
     };
   }
@@ -104,11 +110,7 @@ ${chatHistory.slice(-1000)}
 export const generateDynamicSuggestions = async (history: string, logs: LogEntry[], language: 'en' | 'te'): Promise<string[]> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const latestLogs = logs.slice(0, 2).map(l => l.type).join(', ');
-    
-    const prompt = `Suggest 4 short follow-up questions for a parent based on:
-    History: ${history.slice(-500)}
-    Recent activity: ${latestLogs}`;
+    const prompt = `Suggest 3 proactive pediatric follow-up questions based on this chat: ${history.slice(-500)}`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-flash-lite-latest',
@@ -119,7 +121,7 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
             type: Type.ARRAY,
             items: { type: Type.STRING }
           },
-          systemInstruction: `Suggest brief pediatric follow-up questions in ${language === 'te' ? 'Telugu' : 'English'}.`,
+          systemInstruction: `Suggest brief, proactive pediatric questions in ${language === 'te' ? 'Telugu' : 'English'}. Avoid markdown.`,
           thinkingConfig: { thinkingBudget: 0 }
       }
     });
@@ -137,15 +139,12 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Summarize ${profile.name}'s status briefly in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 2))}`;
+    const prompt = `Provide a health summary for ${profile.name} based on: ${JSON.stringify(logs.slice(0, 5))}. No markdown.`;
     
     const response = await ai.models.generateContent({
       model: 'gemini-flash-lite-latest',
       contents: prompt,
-      config: { 
-        systemInstruction: "Pediatric summary agent.",
-        thinkingConfig: { thinkingBudget: 0 }
-      }
+      config: { systemInstruction: "Brief pediatric health agent." }
     });
     return response.text || "";
   } catch {
@@ -156,18 +155,15 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 export const generateFormalReport = async (logs: LogEntry[], profile: InfantProfile, chatHistory: string): Promise<string> => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Clinical report for ${profile.name}. Logs: ${JSON.stringify(logs.slice(0, 20))}.`;
+        const prompt = `Create a formal medical report for ${profile.name} using logs: ${JSON.stringify(logs.slice(0, 20))}. Structure with headers but NO markdown symbols.`;
         
         const response = await ai.models.generateContent({
           model: 'gemini-flash-lite-latest',
           contents: prompt,
-          config: { 
-            systemInstruction: "Professional medical summary.",
-            thinkingConfig: { thinkingBudget: 0 }
-          }
+          config: { systemInstruction: "Professional clinical reporting agent." }
         });
-        return response.text || "Report unavailable.";
+        return response.text || "Report generation failed.";
       } catch {
-        return "Error generating clinical report.";
+        return "Error creating clinical report.";
       }
 };
