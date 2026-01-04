@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { LogEntry, InfantProfile } from "../types";
 import { REFERENCE_DOCS } from "./documents";
@@ -33,7 +34,6 @@ export const generateHealthInsight = async (
   chatHistory: string
 ): Promise<AIResponse> => {
   try {
-    // FIX: Using strict initialization format for GoogleGenAI with process.env.API_KEY
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const logSummary = logs.slice(0, 8).map(log => {
@@ -60,17 +60,17 @@ ${chatHistory.slice(-1000)}
 `;
 
     const response = await ai.models.generateContent({
-        // 'gemini-3-flash-preview' is chosen for Basic Text Tasks
-        model: 'gemini-3-flash-preview',
+        // Using 'gemini-flash-lite-latest' for maximum free tier stability
+        model: 'gemini-flash-lite-latest',
         contents: prompt,
         config: {
             systemInstruction: getSystemInstruction(profile),
             tools: [{ googleSearch: {} }],
-            temperature: 0.2,
+            temperature: 0.1,
+            thinkingConfig: { thinkingBudget: 0 }
         }
     });
     
-    // FIX: Accessing .text as a property, not a method
     const text = response.text || "I'm having trouble analyzing the data right now.";
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
@@ -83,11 +83,10 @@ ${chatHistory.slice(-1000)}
     const errorMessage = error?.message || "Unknown connection error";
     const isTe = profile.language === 'te';
     
-    // Specifically handle 429 Quota errors for Free Tier
     if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
       return {
         text: isTe 
-          ? "⚠️ ఉచిత పరిమితి (Free Limit) ముగిసింది. దయచేసి కొన్ని సెకన్లు ఆగి మళ్ళీ ప్రయత్నిండి." 
+          ? "⚠️ ఉచిత పరిమితి (Free Limit) ముగిసింది. దయచేసి కొన్ని సెకన్లు ఆగి మళ్ళీ ప్రయత్నించండి." 
           : "⚠️ Free Tier Limit Reached. Please wait a few seconds and try your request again.",
         sources: []
       };
@@ -104,7 +103,6 @@ ${chatHistory.slice(-1000)}
 
 export const generateDynamicSuggestions = async (history: string, logs: LogEntry[], language: 'en' | 'te'): Promise<string[]> => {
   try {
-    // FIX: Using strict initialization format for GoogleGenAI with process.env.API_KEY
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const latestLogs = logs.slice(0, 2).map(l => l.type).join(', ');
     
@@ -113,7 +111,7 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
     Recent activity: ${latestLogs}`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-flash-lite-latest',
       contents: prompt,
       config: { 
           responseMimeType: "application/json",
@@ -121,12 +119,12 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
             type: Type.ARRAY,
             items: { type: Type.STRING }
           },
-          systemInstruction: `Suggest brief pediatric follow-up questions in ${language === 'te' ? 'Telugu' : 'English'}.`
+          systemInstruction: `Suggest brief pediatric follow-up questions in ${language === 'te' ? 'Telugu' : 'English'}.`,
+          thinkingConfig: { thinkingBudget: 0 }
       }
     });
     
     try {
-      // FIX: Accessing .text as a property
       return JSON.parse(response.text || "[]");
     } catch {
       return [];
@@ -138,16 +136,17 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
 
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
-    // FIX: Using strict initialization format for GoogleGenAI with process.env.API_KEY
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Summarize ${profile.name}'s status briefly in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 2))}`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-flash-lite-latest',
       contents: prompt,
-      config: { systemInstruction: "Pediatric summary agent." }
+      config: { 
+        systemInstruction: "Pediatric summary agent.",
+        thinkingConfig: { thinkingBudget: 0 }
+      }
     });
-    // FIX: Accessing .text as a property
     return response.text || "";
   } catch {
     return "";
@@ -156,16 +155,17 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 
 export const generateFormalReport = async (logs: LogEntry[], profile: InfantProfile, chatHistory: string): Promise<string> => {
     try {
-        // FIX: Using strict initialization format for GoogleGenAI with process.env.API_KEY
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const prompt = `Clinical report for ${profile.name}. Logs: ${JSON.stringify(logs.slice(0, 20))}.`;
         
         const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-flash-lite-latest',
           contents: prompt,
-          config: { systemInstruction: "Professional medical summary." }
+          config: { 
+            systemInstruction: "Professional medical summary.",
+            thinkingConfig: { thinkingBudget: 0 }
+          }
         });
-        // FIX: Accessing .text as a property
         return response.text || "Report unavailable.";
       } catch {
         return "Error generating clinical report.";
