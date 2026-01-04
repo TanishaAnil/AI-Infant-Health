@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { InfantProfile, AgeGroup, Language } from '../types';
+import { InfantProfile, AgeGroup, Language, Gender } from '../types';
 import { Baby, ArrowRight } from 'lucide-react';
 import { t } from '../utils/translations';
 
@@ -13,6 +13,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [birthDate, setBirthDate] = useState('');
   const [weight, setWeight] = useState('');
   const [lang, setLang] = useState<Language>('en');
+  // FIX: Added gender state to fulfill InfantProfile requirements
+  const [gender, setGender] = useState<Gender>(Gender.MALE);
 
   const calculateAgeGroup = (bDate: Date): AgeGroup => {
     const now = new Date();
@@ -27,12 +29,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     if (!name || !birthDate) return;
 
     const bDate = new Date(birthDate);
+    // FIX: Line 30 - included the missing 'gender' property required by InfantProfile
     const profile: InfantProfile = {
       name,
       parentName,
       birthDate: bDate,
       weight: parseFloat(weight) || 3.5,
       height: 50, // default
+      gender,
       ageGroup: calculateAgeGroup(bDate),
       language: lang
     };
@@ -76,6 +80,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase mb-1 ml-1">{t('weight', lang)}</label>
                     <input type="number" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="kg" />
+                </div>
+            </div>
+
+            {/* Added Gender selection UI to match the InfantProfile requirements */}
+            <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1 ml-1">Gender</label>
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button type="button" onClick={() => setGender(Gender.MALE)} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${gender === Gender.MALE ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}>Male</button>
+                    <button type="button" onClick={() => setGender(Gender.FEMALE)} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${gender === Gender.FEMALE ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}>Female</button>
                 </div>
             </div>
 

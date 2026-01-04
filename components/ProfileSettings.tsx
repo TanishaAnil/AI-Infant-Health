@@ -1,0 +1,108 @@
+
+import React, { useState } from 'react';
+import { InfantProfile, Gender, AgeGroup } from '../types';
+import { User, Calendar, Ruler, Weight, Save, LogOut } from 'lucide-react';
+
+interface ProfileSettingsProps {
+  profile: InfantProfile;
+  onUpdate: (updated: InfantProfile) => void;
+  onLogout: () => void;
+}
+
+export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onUpdate, onLogout }) => {
+  const [formData, setFormData] = useState<InfantProfile>(profile);
+
+  const calculateAgeGroup = (bDate: Date): AgeGroup => {
+    const now = new Date();
+    const diffMonths = (now.getTime() - bDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+    if (diffMonths <= 3) return AgeGroup.NEWBORN;
+    if (diffMonths <= 12) return AgeGroup.INFANT;
+    return AgeGroup.TODDLER;
+  };
+
+  const handleSave = () => {
+    const updated = {
+      ...formData,
+      birthDate: new Date(formData.birthDate),
+      ageGroup: calculateAgeGroup(new Date(formData.birthDate))
+    };
+    onUpdate(updated);
+    alert("Profile Updated Successfully!");
+  };
+
+  return (
+    <div className="p-4 space-y-6 animate-fade-in pb-20">
+      <div className="flex items-center justify-between px-2">
+        <h2 className="text-2xl font-black text-slate-900">Profile Settings</h2>
+        <button onClick={onLogout} className="text-rose-500 p-2 bg-rose-50 rounded-xl">
+          <LogOut size={20} />
+        </button>
+      </div>
+
+      <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 space-y-6">
+        <div className="space-y-1">
+          <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Baby's Name</label>
+          <div className="relative">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+            <input 
+              type="text" 
+              value={formData.name} 
+              onChange={e => setFormData({...formData, name: e.target.value})}
+              className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" 
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Weight (kg)</label>
+            <div className="relative">
+              <Weight className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <input 
+                type="number" 
+                step="0.1"
+                value={formData.weight} 
+                onChange={e => setFormData({...formData, weight: parseFloat(e.target.value)})}
+                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" 
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Height (cm)</label>
+            <div className="relative">
+              <Ruler className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <input 
+                type="number" 
+                value={formData.height} 
+                onChange={e => setFormData({...formData, height: parseFloat(e.target.value)})}
+                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Sex</label>
+          <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+            {[Gender.MALE, Gender.FEMALE].map(g => (
+              <button
+                key={g}
+                onClick={() => setFormData({...formData, gender: g})}
+                className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${formData.gender === g ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button 
+          onClick={handleSave}
+          className="w-full py-5 bg-emerald-600 text-white rounded-[24px] font-black shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
+        >
+          <Save size={18} /> Save Changes
+        </button>
+      </div>
+    </div>
+  );
+};

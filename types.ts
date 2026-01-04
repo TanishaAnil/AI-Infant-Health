@@ -11,10 +11,10 @@ export enum LogType {
   BLOOD_GLUCOSE = 'BLOOD_GLUCOSE'
 }
 
-export enum FeedType {
-  BREAST = 'BREAST',
-  BOTTLE = 'BOTTLE',
-  SOLIDS = 'SOLIDS'
+export enum Gender {
+  MALE = 'Male',
+  FEMALE = 'Female',
+  OTHER = 'Other'
 }
 
 export enum AgeGroup {
@@ -30,14 +30,14 @@ export interface LogEntry {
   type: LogType;
   timestamp: Date;
   details: {
-    amount?: number; // oz or ml
-    duration?: number; // minutes
+    amount?: number;
+    duration?: number;
     side?: 'left' | 'right' | 'both';
-    contents?: string; // for diaper
-    temperature?: number; // celsius
-    bpm?: number; // heart rate
-    oxygen?: number; // spo2 percentage
-    glucose?: number; // mg/dL
+    contents?: string;
+    temperature?: number;
+    bpm?: number;
+    oxygen?: number;
+    glucose?: number;
     symptom?: string;
     note?: string;
   };
@@ -55,10 +55,11 @@ export interface InfantProfile {
   name: string;
   parentName: string;
   birthDate: Date;
-  weight: number; // kg
-  height: number; // cm
-  ageGroup?: AgeGroup; // Derived field
+  weight: number;
+  height: number;
+  gender: Gender;
+  ageGroup?: AgeGroup;
   language: Language;
 }
 
-export type ViewState = 'dashboard' | 'logs' | 'analysis' | 'report';
+export type ViewState = 'landing' | 'auth' | 'dashboard' | 'logs' | 'analysis' | 'report' | 'profile';

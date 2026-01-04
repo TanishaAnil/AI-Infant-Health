@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { LogEntry, InfantProfile } from "../types";
 import { REFERENCE_DOCS } from "./documents";
@@ -34,8 +33,8 @@ export const generateHealthInsight = async (
   chatHistory: string
 ): Promise<AIResponse> => {
   try {
-    // Re-initialize with latest API key from environment
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    // FIX: Using strict initialization format for GoogleGenAI with process.env.API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const logSummary = logs.slice(0, 8).map(log => {
       const time = new Date(log.timestamp).toLocaleTimeString();
@@ -61,7 +60,7 @@ ${chatHistory.slice(-1000)}
 `;
 
     const response = await ai.models.generateContent({
-        // 'gemini-3-flash-preview' is the most stable and generous model for the Free Tier
+        // 'gemini-3-flash-preview' is chosen for Basic Text Tasks
         model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
@@ -71,6 +70,7 @@ ${chatHistory.slice(-1000)}
         }
     });
     
+    // FIX: Accessing .text as a property, not a method
     const text = response.text || "I'm having trouble analyzing the data right now.";
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
@@ -87,7 +87,7 @@ ${chatHistory.slice(-1000)}
     if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
       return {
         text: isTe 
-          ? "⚠️ ఉచిత పరిమితి (Free Limit) ముగిసింది. దయచేసి కొన్ని సెకన్లు ఆగి మళ్ళీ ప్రయత్నించండి." 
+          ? "⚠️ ఉచిత పరిమితి (Free Limit) ముగిసింది. దయచేసి కొన్ని సెకన్లు ఆగి మళ్ళీ ప్రయత్నిండి." 
           : "⚠️ Free Tier Limit Reached. Please wait a few seconds and try your request again.",
         sources: []
       };
@@ -104,7 +104,8 @@ ${chatHistory.slice(-1000)}
 
 export const generateDynamicSuggestions = async (history: string, logs: LogEntry[], language: 'en' | 'te'): Promise<string[]> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    // FIX: Using strict initialization format for GoogleGenAI with process.env.API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const latestLogs = logs.slice(0, 2).map(l => l.type).join(', ');
     
     const prompt = `Suggest 4 short follow-up questions for a parent based on:
@@ -125,6 +126,7 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
     });
     
     try {
+      // FIX: Accessing .text as a property
       return JSON.parse(response.text || "[]");
     } catch {
       return [];
@@ -136,7 +138,8 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
 
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    // FIX: Using strict initialization format for GoogleGenAI with process.env.API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Summarize ${profile.name}'s status briefly in ${profile.language === 'te' ? 'Telugu' : 'English'}. Logs: ${JSON.stringify(logs.slice(0, 2))}`;
     
     const response = await ai.models.generateContent({
@@ -144,6 +147,7 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
       contents: prompt,
       config: { systemInstruction: "Pediatric summary agent." }
     });
+    // FIX: Accessing .text as a property
     return response.text || "";
   } catch {
     return "";
@@ -152,7 +156,8 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 
 export const generateFormalReport = async (logs: LogEntry[], profile: InfantProfile, chatHistory: string): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+        // FIX: Using strict initialization format for GoogleGenAI with process.env.API_KEY
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const prompt = `Clinical report for ${profile.name}. Logs: ${JSON.stringify(logs.slice(0, 20))}.`;
         
         const response = await ai.models.generateContent({
@@ -160,6 +165,7 @@ export const generateFormalReport = async (logs: LogEntry[], profile: InfantProf
           contents: prompt,
           config: { systemInstruction: "Professional medical summary." }
         });
+        // FIX: Accessing .text as a property
         return response.text || "Report unavailable.";
       } catch {
         return "Error generating clinical report.";

@@ -1,19 +1,20 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Login } from './components/Login';
+import { Landing } from './components/Landing';
+import { Auth } from './components/Auth';
 import { Dashboard } from './components/Dashboard';
 import { AgentChat } from './components/AgentChat';
 import { HealthCharts } from './components/HealthCharts';
 import { ReportView } from './components/ReportView';
+import { ProfileSettings } from './components/ProfileSettings';
 import { LogModal } from './components/LogModal';
 import { ViewState, LogEntry, InfantProfile, LogType, ChatMessage } from './types';
-import { LayoutDashboard, Activity, MessageCircle, FileText, PlusCircle, AlertTriangle, VolumeX } from 'lucide-react';
+import { LayoutDashboard, Activity, MessageCircle, FileText, PlusCircle, AlertTriangle, VolumeX, User } from 'lucide-react';
 import { generateDailySummary } from './services/geminiService';
 import { t } from './utils/translations';
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [view, setView] = useState<ViewState>('dashboard');
+  const [view, setView] = useState<ViewState>('landing');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [profile, setProfile] = useState<InfantProfile | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,7 +83,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const fetchDigest = async () => {
-      if (isAuthenticated && profile && logs.length > 0) {
+      if (profile && logs.length > 0) {
         try {
           const summary = await generateDailySummary(logs, profile);
           setDailyDigest(summary.replace(/[#*]/g, ''));
@@ -92,11 +93,11 @@ const App: React.FC = () => {
       }
     };
     fetchDigest();
-  }, [logs, profile, isAuthenticated]);
+  }, [logs, profile]);
 
-  const handleLogin = (userProfile: InfantProfile) => {
+  const handleAuth = (userProfile: InfantProfile) => {
     setProfile(userProfile);
-    setIsAuthenticated(true);
+    setView('dashboard');
     if (logs.length === 0) {
       setLogs([
         { id: '1', type: LogType.FEEDING, timestamp: new Date(Date.now() - 3600000), details: { amount: 4, note: "Good intake" } },
@@ -114,9 +115,8 @@ const App: React.FC = () => {
     setLogs(prev => [newLog, ...prev]);
   };
 
-  if (!isAuthenticated || !profile) {
-    return <Login onLogin={handleLogin} />;
-  }
+  if (view === 'landing') return <Landing onStart={() => setView('auth')} />;
+  if (view === 'auth') return <Auth onAuth={handleAuth} onBack={() => setView('landing')} />;
 
   return (
     <div className="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
@@ -126,91 +126,87 @@ const App: React.FC = () => {
             <AlertTriangle size={20} />
             <span className="text-xs font-black uppercase tracking-widest">Critical Vitals Warning</span>
           </div>
-          <button 
-            onClick={stopAlarmSound}
-            className="bg-white/20 hover:bg-white/30 p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all"
-          >
+          <button onClick={stopAlarmSound} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all">
             <VolumeX size={16} /> Mute Alarm
           </button>
         </div>
       )}
 
       <div className="max-w-md mx-auto w-full h-full flex flex-col sm:border-x sm:border-slate-200 sm:bg-white sm:shadow-2xl">
-        <div className="hidden sm:flex items-center justify-between p-6 border-b border-slate-100 shrink-0 bg-white z-10">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-emerald-500 bg-clip-text text-transparent">NurtureAI</h1>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full uppercase">{profile.language}</span>
-          </div>
-        </div>
-
+        {/* Navigation Wrapper */}
         <main className="flex-1 overflow-hidden relative flex flex-col bg-slate-50/50">
           {view === 'dashboard' && (
-            <div className="flex-1 overflow-y-auto p-4 pb-4">
+            <div className="flex-1 overflow-y-auto p-4">
               {dailyDigest && (
-                <div className="mb-6 bg-gradient-to-br from-indigo-600 to-indigo-800 p-5 rounded-3xl text-white shadow-xl animate-fade-in border border-white/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-white/20 p-1.5 rounded-lg"><Activity size={16} /></div>
-                    <h3 className="font-bold text-sm tracking-wide italic">Daily Insight</h3>
+                <div className="mb-6 bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 rounded-[32px] text-white shadow-xl animate-fade-in border border-white/10 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><Activity size={80} /></div>
+                  <div className="flex items-center gap-2 mb-2 relative z-10">
+                    <Activity size={16} className="text-emerald-300" />
+                    <h3 className="font-black text-xs uppercase tracking-[0.2em]">Health Intelligence</h3>
                   </div>
-                  <p className="text-xs leading-relaxed font-medium opacity-95">{dailyDigest}</p>
+                  <p className="text-sm leading-relaxed relative z-10">{dailyDigest}</p>
                 </div>
               )}
-              <Dashboard logs={logs} profile={profile} onQuickLog={handleQuickLog} />
+              <Dashboard logs={logs} profile={profile!} onQuickLog={handleQuickLog} onViewReport={() => setView('report')} />
             </div>
           )}
           
           {view === 'analysis' && (
-            <div className="flex-1 overflow-y-auto p-4 pb-4 animate-fade-in">
+            <div className="flex-1 overflow-y-auto p-5 animate-fade-in">
               <header className="mb-6">
-                <h2 className="text-xl font-bold text-slate-800">{t('trends', profile.language)}</h2>
-                <p className="text-xs text-slate-400">Biological monitoring metrics</p>
+                <h2 className="text-2xl font-black text-slate-900">Health Trends</h2>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Biological Metrics</p>
               </header>
               <HealthCharts logs={logs} />
             </div>
           )}
           
           {view === 'logs' && (
-            <div className="flex-1 overflow-hidden flex flex-col animate-fade-in h-full">
-              <AgentChat logs={logs} profile={profile} onUpdateHistory={setChatHistory} />
+            <div className="flex-1 overflow-hidden flex flex-col h-full bg-white">
+              <AgentChat logs={logs} profile={profile!} onUpdateHistory={setChatHistory} />
             </div>
           )}
           
           {view === 'report' && (
-            <div className="flex-1 overflow-y-auto pb-4">
-              <ReportView logs={logs} profile={profile} chatHistory={chatHistory} />
+            <div className="flex-1 overflow-y-auto p-2">
+              <ReportView logs={logs} profile={profile!} chatHistory={chatHistory} />
             </div>
+          )}
+
+          {view === 'profile' && (
+            <ProfileSettings profile={profile!} onUpdate={(u) => setProfile(u)} onLogout={() => setView('landing')} />
           )}
         </main>
 
-        <div className="shrink-0 bg-white border-t border-slate-200 p-2 z-20 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.03)]">
+        <div className="shrink-0 bg-white border-t border-slate-100 p-3 z-20 shadow-[0_-15px_30px_rgba(0,0,0,0.04)]">
           <div className="grid grid-cols-5 gap-1 relative items-center">
-            <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={20} />} label={t('dashboard', profile.language)} />
-            <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={<Activity size={20} />} label={t('trends', profile.language)} />
+            <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={20} />} label="Home" />
+            <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={<Activity size={20} />} label="Trends" />
             
-            <div className="relative -top-6 flex justify-center pointer-events-none">
+            <div className="relative -top-8 flex justify-center pointer-events-none">
               <button 
                 onClick={() => handleQuickLog(LogType.SYMPTOM)} 
-                className="pointer-events-auto w-14 h-14 bg-indigo-600 rounded-full shadow-xl flex items-center justify-center text-white active:scale-90 transition-all border-4 border-white hover:bg-indigo-700"
+                className="pointer-events-auto w-16 h-16 bg-indigo-600 rounded-[24px] shadow-2xl flex items-center justify-center text-white active:scale-90 transition-all border-4 border-white hover:bg-indigo-700"
               >
-                <PlusCircle size={28} />
+                <PlusCircle size={32} />
               </button>
             </div>
 
-            <NavButton active={view === 'logs'} onClick={() => setView('logs')} icon={<MessageCircle size={20} />} label={t('agent', profile.language)} />
-            <NavButton active={view === 'report'} onClick={() => setView('report')} icon={<FileText size={20} />} label={t('report', profile.language)} />
+            <NavButton active={view === 'logs'} onClick={() => setView('logs')} icon={<MessageCircle size={20} />} label="AI Doctor" />
+            <NavButton active={view === 'profile'} onClick={() => setView('profile')} icon={<User size={20} />} label="Profile" />
           </div>
         </div>
       </div>
       
-      <LogModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} type={modalType} onSave={saveLog} language={profile.language} />
+      <LogModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} type={modalType} onSave={saveLog} language={profile!.language} />
     </div>
   );
 };
 
 const NavButton: React.FC<{active: boolean; onClick: () => void; icon: React.ReactNode; label: string}> = ({ active, onClick, icon, label }) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all ${active ? 'text-indigo-600 bg-indigo-50/50' : 'text-slate-400 hover:text-slate-600'}`}>
-    <div className={`transition-transform duration-200 ${active ? 'scale-110' : 'scale-100'}`}>{icon}</div>
-    <span className="text-[10px] font-bold mt-1.5 truncate max-w-full tracking-tight">{label}</span>
+  <button onClick={onClick} className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all ${active ? 'text-indigo-600 bg-indigo-50/50' : 'text-slate-400 hover:text-slate-600'}`}>
+    <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'scale-100'}`}>{icon}</div>
+    <span className="text-[10px] font-black uppercase tracking-tighter mt-1.5">{label}</span>
   </button>
 );
 
