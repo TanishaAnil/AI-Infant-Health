@@ -11,6 +11,12 @@ export enum LogType {
   BLOOD_GLUCOSE = 'BLOOD_GLUCOSE'
 }
 
+export enum SeverityLevel {
+  STABLE = 'STABLE',
+  WARNING = 'WARNING',
+  EMERGENCY = 'EMERGENCY'
+}
+
 export enum Gender {
   MALE = 'Male',
   FEMALE = 'Female',
@@ -40,6 +46,7 @@ export interface LogEntry {
     glucose?: number;
     symptom?: string;
     note?: string;
+    severity?: SeverityLevel;
   };
 }
 
@@ -54,6 +61,7 @@ export interface ChatMessage {
 export interface InfantProfile {
   name: string;
   parentName: string;
+  doctorPhone?: string;
   birthDate: Date;
   weight: number;
   height: number;

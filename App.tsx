@@ -8,8 +8,8 @@ import { HealthCharts } from './components/HealthCharts';
 import { ReportView } from './components/ReportView';
 import { ProfileSettings } from './components/ProfileSettings';
 import { LogModal } from './components/LogModal';
-import { ViewState, LogEntry, InfantProfile, LogType, ChatMessage } from './types';
-import { LayoutDashboard, Activity, MessageCircle, FileText, PlusCircle, AlertTriangle, VolumeX, User } from 'lucide-react';
+import { ViewState, LogEntry, InfantProfile, LogType, ChatMessage, SeverityLevel } from './types';
+import { LayoutDashboard, Activity, MessageCircle, FileText, PlusCircle, AlertTriangle, VolumeX, User, Phone } from 'lucide-react';
 import { generateDailySummary } from './services/geminiService';
 import { t } from './utils/translations';
 
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [modalType, setModalType] = useState<LogType | null>(null);
   const [dailyDigest, setDailyDigest] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [severity, setSeverity] = useState<SeverityLevel>(SeverityLevel.STABLE);
   const [isAlarmActive, setIsAlarmActive] = useState(false);
   
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -34,7 +35,7 @@ const App: React.FC = () => {
     setIsAlarmActive(false);
   };
 
-  const playAlarmSound = () => {
+  const playAlarmSound = (isEmergency: boolean) => {
     if (isAlarmActive) return;
     setIsAlarmActive(true);
     
@@ -46,40 +47,55 @@ const App: React.FC = () => {
       if (!audioCtxRef.current) return;
       const osc = audioCtxRef.current.createOscillator();
       const gain = audioCtxRef.current.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, audioCtxRef.current.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(440, audioCtxRef.current.currentTime + 0.5);
+      osc.type = isEmergency ? 'sawtooth' : 'sine';
+      osc.frequency.setValueAtTime(isEmergency ? 1200 : 880, audioCtxRef.current.currentTime);
       gain.gain.setValueAtTime(0.1, audioCtxRef.current.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtxRef.current.currentTime + 0.5);
       osc.connect(gain);
       gain.connect(audioCtxRef.current.destination);
       osc.start();
-      osc.stop(audioCtxRef.current.currentTime + 0.5);
+      osc.stop(audioCtxRef.current.currentTime + 0.3);
     };
 
     playBeep();
-    alarmIntervalRef.current = window.setInterval(playBeep, 1000);
+    alarmIntervalRef.current = window.setInterval(playBeep, isEmergency ? 500 : 1200);
   };
 
   useEffect(() => {
     if (logs.length === 0) return;
     const latest = logs[0];
-    let isDanger = false;
+    let currentSeverity = SeverityLevel.STABLE;
 
     if (latest.type === LogType.TEMPERATURE && latest.details.temperature) {
-      if (latest.details.temperature > 38.5 || latest.details.temperature < 35.5) isDanger = true;
+      if (latest.details.temperature >= 39.5 || latest.details.temperature <= 35.0) currentSeverity = SeverityLevel.EMERGENCY;
+      else if (latest.details.temperature > 37.8 || latest.details.temperature < 36.0) currentSeverity = SeverityLevel.WARNING;
     }
     if (latest.type === LogType.HEART_RATE && latest.details.bpm) {
-      if (latest.details.bpm > 170 || latest.details.bpm < 80) isDanger = true;
+      if (latest.details.bpm > 185 || latest.details.bpm < 70) currentSeverity = SeverityLevel.EMERGENCY;
+      else if (latest.details.bpm > 165 || latest.details.bpm < 90) currentSeverity = SeverityLevel.WARNING;
     }
     if (latest.type === LogType.SPO2 && latest.details.oxygen) {
-      if (latest.details.oxygen < 94) isDanger = true;
+      if (latest.details.oxygen < 90) currentSeverity = SeverityLevel.EMERGENCY;
+      else if (latest.details.oxygen < 94) currentSeverity = SeverityLevel.WARNING;
     }
 
-    if (isDanger) {
-      playAlarmSound();
+    setSeverity(currentSeverity);
+
+    if (currentSeverity === SeverityLevel.EMERGENCY) {
+      playAlarmSound(true);
+    } else if (currentSeverity === SeverityLevel.WARNING) {
+      playAlarmSound(false);
+    } else {
+      stopAlarmSound();
     }
   }, [logs]);
+
+  const triggerEmergencyAlert = () => {
+    if (!profile) return;
+    const latestVitals = logs.slice(0, 3).map(l => `${l.type}: ${JSON.stringify(l.details)}`).join('\n');
+    const message = `EMERGENCY ALERT for ${profile.name}!\nSeverity: ${severity}\nLatest Vitals:\n${latestVitals}\nPlease check NurtureAI Dashboard immediately.`;
+    const whatsappUrl = `https://wa.me/${profile.doctorPhone || '919999999999'}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   useEffect(() => {
     const fetchDigest = async () => {
@@ -121,19 +137,27 @@ const App: React.FC = () => {
   return (
     <div className="h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden flex flex-col">
       {isAlarmActive && (
-        <div className="bg-rose-600 text-white p-3 flex items-center justify-between animate-pulse z-50">
+        <div className={`text-white p-3 flex items-center justify-between z-50 shadow-lg ${severity === SeverityLevel.EMERGENCY ? 'bg-rose-600 animate-pulse' : 'bg-amber-500'}`}>
           <div className="flex items-center gap-2">
             <AlertTriangle size={20} />
-            <span className="text-xs font-black uppercase tracking-widest">Critical Vitals Warning</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {severity} DETECTED: ACTION REQUIRED
+            </span>
           </div>
-          <button onClick={stopAlarmSound} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all">
-            <VolumeX size={16} /> Mute Alarm
-          </button>
+          <div className="flex gap-2">
+            {severity === SeverityLevel.EMERGENCY && (
+              <button onClick={triggerEmergencyAlert} className="bg-white text-rose-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
+                <Phone size={12} fill="currentColor" /> Alert Doctor
+              </button>
+            )}
+            <button onClick={stopAlarmSound} className="bg-black/20 hover:bg-black/30 p-2 rounded-lg flex items-center gap-2 text-[10px] font-bold transition-all">
+              <VolumeX size={14} /> Mute
+            </button>
+          </div>
         </div>
       )}
 
       <div className="max-w-md mx-auto w-full h-full flex flex-col sm:border-x sm:border-slate-200 sm:bg-white sm:shadow-2xl">
-        {/* Navigation Wrapper */}
         <main className="flex-1 overflow-hidden relative flex flex-col bg-slate-50/50">
           {view === 'dashboard' && (
             <div className="flex-1 overflow-y-auto p-4">
@@ -198,7 +222,7 @@ const App: React.FC = () => {
         </div>
       </div>
       
-      <LogModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} type={modalType} onSave={saveLog} language={profile!.language} />
+      <LogModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} type={modalType} onSave={saveLog} language={profile?.language || 'en'} />
     </div>
   );
 };

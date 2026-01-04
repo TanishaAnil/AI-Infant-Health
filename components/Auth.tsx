@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { InfantProfile, AgeGroup, Language, Gender } from '../types';
-import { Baby, ArrowRight, Mail, Lock, User, Calendar, Weight, Ruler } from 'lucide-react';
+import { Baby, ArrowRight, Mail, Lock, User, Calendar, Weight, Ruler, Phone } from 'lucide-react';
 import { t } from '../utils/translations';
 
 interface AuthProps {
@@ -13,6 +13,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuth, onBack }) => {
   const [isLogin, setIsLogin] = useState(false);
   const [name, setName] = useState('');
   const [parentName, setParentName] = useState('');
+  const [doctorPhone, setDoctorPhone] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [weight, setWeight] = useState('3.5');
   const [height, setHeight] = useState('50');
@@ -30,10 +31,10 @@ export const Auth: React.FC<AuthProps> = ({ onAuth, onBack }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isLogin) {
-      // Mock login - auto-populate or handle existing user
       onAuth({
         name: 'Demo Baby',
         parentName: 'Demo Parent',
+        doctorPhone: '919999999999',
         birthDate: new Date('2024-01-01'),
         weight: 6.2,
         height: 65,
@@ -48,6 +49,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuth, onBack }) => {
     onAuth({
       name,
       parentName,
+      doctorPhone,
       birthDate: bDate,
       weight: parseFloat(weight),
       height: parseFloat(height),
@@ -84,24 +86,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuth, onBack }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {isLogin ? (
-              <>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Parent Email</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                    <input type="email" required className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="email@example.com" />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                    <input type="password" required className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="••••••••" />
-                  </div>
-                </div>
-              </>
-            ) : (
+            {!isLogin && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -111,6 +96,14 @@ export const Auth: React.FC<AuthProps> = ({ onAuth, onBack }) => {
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Parent's Name</label>
                     <input required type="text" value={parentName} onChange={e => setParentName(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="Priya" />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Pediatrician WhatsApp (with country code)</label>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                    <input required type="tel" value={doctorPhone} onChange={e => setDoctorPhone(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold" placeholder="919999999999" />
                   </div>
                 </div>
 
@@ -145,6 +138,25 @@ export const Auth: React.FC<AuthProps> = ({ onAuth, onBack }) => {
                   </div>
                 </div>
               </>
+            )}
+
+            {isLogin && (
+                <div className="space-y-4">
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Parent Email</label>
+                        <div className="relative">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                            <input type="email" required className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm" placeholder="email@example.com" />
+                        </div>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
+                        <div className="relative">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                            <input type="password" required className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm" placeholder="••••••••" />
+                        </div>
+                    </div>
+                </div>
             )}
 
             <button type="submit" className="w-full py-5 mt-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs">
