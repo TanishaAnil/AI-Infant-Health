@@ -1,10 +1,3 @@
-// ============================================================================
-// KNOWLEDGE BASE REFERENCES
-// ============================================================================
-// Since the documents are too large to paste, we provide the Titles and URLs.
-// The AI will use its internal training data associated with these official sources
-// to answer questions accurately.
-// ============================================================================
 
 export interface DocReference {
   id: string;
@@ -16,20 +9,22 @@ export interface DocReference {
 export const REFERENCE_DOCS: DocReference[] = [
   {
     id: "doc1",
-    title: "FACILITY BASED INTEGRATED MANAGEMENT OF NEONATAL AND CHILDHOOD ILLNESS (F-IMNCI)",
+    title: "IMNCI Chart Booklet (Integrated Management of Neonatal and Childhood Illness)",
     url: "https://nhm.gov.in/images/pdf/programmes/child-health/guidelines/imnci_chart_booklet.pdf",
-    description: "Model Chapter for textbooks for medical students and allied health professionals."
+    description: "Primary clinical standard for pediatric triage and treatment in India."
   },
   {
     id: "doc2",
-    title: "AAP Safe Sleep Guidelines (2022 Update)",
+    title: "AAP (American Academy of Pediatrics) Safe Sleep and SIDS Guidelines",
     url: "https://publications.aap.org/pediatrics/article/150/1/e2022057990/188304/Sleep-Related-Infant-Deaths-Updated-2022",
-    description: "Recommendations for Reducing Infant Deaths in the Sleep Environment."
+    description: "Latest global standards for infant sleep safety."
   },
   {
     id: "doc3",
-    title: "KEN-CH-20-01-OPERATIONALGUIDANCE-2017-eng-IMNCI-Guidelines-Healthcare-Providers.pdf",
-    url: "https://platform.who.int/docs/default-source/mca-documents/policy-documents/operational-guidance/KEN-CH-20-01-OPERATIONALGUIDANCE-2017-eng-IMNCI-Guidelines-Healthcare-Providers.pdf",
-    description: "Assessment and initial management of fever in young children."
+    title: "WHO (World Health Organization) Infant and Young Child Feeding Fact Sheet",
+    url: "https://www.who.int/news-room/fact-sheets/detail/infant-and-young-child-feeding",
+    description: "International standards for nutrition and breastfeeding."
   }
 ];
+
+export const DOC_TITLES_FOR_SEARCH = REFERENCE_DOCS.map(d => `- ${d.title}: ${d.url}`).join('\n');

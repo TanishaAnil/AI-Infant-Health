@@ -1,33 +1,31 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { LogEntry, InfantProfile } from "../types";
-import { REFERENCE_DOCS } from "./documents";
+import { DOC_TITLES_FOR_SEARCH } from "./documents";
 
 const getSystemInstruction = (profile: InfantProfile) => {
-  const docContext = REFERENCE_DOCS.map(d => `${d.title}: ${d.description}`).join('\n');
+  return `You are "NurtureAI Medical Agent," a specialized pediatric clinical assistant.
 
-  return `You are "NurtureAI Physician Assistant," a clinical agentic AI. 
+REAL-TIME RETRIEVAL PIPELINE:
+1. INPUT: Detect user language (${profile.language === 'te' ? 'Telugu' : 'English'}).
+2. TRANSLATION: If input is Telugu, translate the parent's health concern into clinical English terms.
+3. RETRIEVAL: You MUST use the Google Search tool to retrieve specific information from these authoritative sources or find their content online:
+${DOC_TITLES_FOR_SEARCH}
+4. ANALYSIS: Compare the retrieved clinical protocols (IMNCI/WHO/AAP) against the infant's vitals (${profile.weight}kg, ${profile.ageGroup}).
+5. SYNTHESIS: Generate a response in ${profile.language === 'te' ? 'Telugu script' : 'English'}.
 
-INTERNAL REASONING LOOP:
-1. INPUT: Detect language (${profile.language === 'te' ? 'Telugu' : 'English'}).
-2. TRANSLATION: If Telugu, translate the intent to professional medical English.
-3. RAG SEARCH: Query the provided documents and Google Search (using English) for pediatric standards (AAP, WHO, NHM India).
-4. SYNTHESIS: Combine recent logs with clinical findings.
-5. PROACTIVE INQUIRY: Identify what's missing (e.g., if fever is mentioned but no hydration status is known, ASK).
-6. OUTPUT: Generate a structured response in ${profile.language === 'te' ? 'Telugu' : 'English'}.
+REQUIRED SECTIONS (NO MARKDOWN SYMBOLS - USE PLAIN TEXT):
+- SUMMARY: Clinical assessment of the current situation.
+- DIETARY GUIDANCE: Specific feeding/hydration advice.
+- PROACTIVE QUESTIONS: Ask for missing information (e.g., activity level, urine count, breathing rate).
+- MEDICINES AND SAFETY: Home care tips. Always add: "Only a physical doctor can prescribe medicine."
+- EMERGENCY RED FLAGS: Clear list of signs for immediate ER visit.
+- WHEN TO RETURN TO DOCTOR: Criteria for regular follow-up.
 
-REQUIRED OUTPUT STRUCTURE (DO NOT USE # OR * SYMBOLS):
-- [SUMMARY]: Clear explanation of what is happening.
-- [DIET & HYDRATION]: Specific feeding advice based on age.
-- [SYMPTOM CHECKLIST]: Proactively ask 2-3 targeted questions about related issues (e.g., urine count, activity level).
-- [MEDICINES & SAFETY]: State clearly that only a physical doctor can prescribe. Provide home care safety tips (e.g., paracetamol safety).
-- [RED FLAGS]: List critical signs for immediate ER visit.
-- [DOCTOR CONSULTATION]: Explicit criteria for when to book a non-emergency appointment.
-
-STRICT RULES:
-- REMOVE all markdown markers like asterisks (*), hashes (#), or underscores (_). Use CAPITALIZED HEADERS for sections.
-- Never give specific dosages without a "Consult your doctor" disclaimer.
-- Be empathetic but clinical.`;
+STRICT FORMATTING:
+- REMOVE all asterisks (*), hashes (#), underscores (_), and other markdown.
+- Use CAPITALIZED HEADERS for sections.
+- Ensure the tone is empathetic but medically grounded.`;
 };
 
 export interface AIResponse {
@@ -50,34 +48,37 @@ export const generateHealthInsight = async (
     }).join('\n');
 
     const prompt = `
-INFANT DATA:
+PARENTS QUERY: "${query}"
+
+INFANT STATS:
 Name: ${profile.name}
 Weight: ${profile.weight}kg
 Age Group: ${profile.ageGroup}
-Recent Logs:
+History: ${chatHistory.slice(-500)}
+
+RECENT VITALS LOGS:
 ${logSummary}
 
-CONVERSATION HISTORY:
-${chatHistory.slice(-1500)}
-
-PARENT MESSAGE:
-"${query}"
-
-Execute the Clinical Agentic Loop. Ensure the response is proactive, asks follow-up questions, and follows the specified structure without markdown.
+ACTION: 
+1. Use Google Search to retrieve specific pediatric guidelines from the URLs provided in your system instructions.
+2. Analyze if the logs indicate any WARNING or EMERGENCY based on IMNCI.
+3. Provide a structured response in ${profile.language === 'te' ? 'Telugu' : 'English'}.
+4. DO NOT USE ANY MARKDOWN CHARACTERS.
 `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-flash-lite-latest',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             systemInstruction: getSystemInstruction(profile),
             tools: [{ googleSearch: {} }],
             temperature: 0.1,
-            thinkingConfig: { thinkingBudget: 0 }
         }
     });
     
-    const text = response.text || "I'm having trouble analyzing the data right now.";
+    const text = response.text || "I am currently unable to access the clinical data.";
+    
+    // Extract sources from grounding metadata for true RAG transparency
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
       .filter(Boolean) || [];
@@ -86,22 +87,11 @@ Execute the Clinical Agentic Loop. Ensure the response is proactive, asks follow
 
   } catch (error: any) {
     console.error("Gemini Health Insight Error:", error);
-    const errorMessage = error?.message || "Connection failure";
     const isTe = profile.language === 'te';
-    
-    if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
-      return {
-        text: isTe 
-          ? "క్షమించాలి, సర్వర్ పరిమితి మగిసింది. దయచేసి కాసేపటి తర్వాత ప్రయత్నించండి." 
-          : "Free Tier Limit Reached. Please wait a moment before trying again.",
-        sources: []
-      };
-    }
-
     return { 
       text: isTe 
-        ? `నెట్‌వర్క్ ఇబ్బంది కలిగింది. దయచేసి మళ్ళీ ప్రయత్నించండి.` 
-        : `Connection error. Please try again.`, 
+        ? "సాంకేతిక కారణాల వల్ల వైద్య సమాచారం అందుబాటులో లేదు." 
+        : "Clinical retrieval service interrupted. Please try again.", 
       sources: [] 
     };
   }
@@ -110,10 +100,10 @@ Execute the Clinical Agentic Loop. Ensure the response is proactive, asks follow
 export const generateDynamicSuggestions = async (history: string, logs: LogEntry[], language: 'en' | 'te'): Promise<string[]> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Suggest 3 proactive pediatric follow-up questions based on this chat: ${history.slice(-500)}`;
+    const prompt = `Based on chat, suggest 3 pediatric follow-up questions in ${language === 'te' ? 'Telugu' : 'English'}. No markdown.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: { 
           responseMimeType: "application/json",
@@ -121,8 +111,7 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
             type: Type.ARRAY,
             items: { type: Type.STRING }
           },
-          systemInstruction: `Suggest brief, proactive pediatric questions in ${language === 'te' ? 'Telugu' : 'English'}. Avoid markdown.`,
-          thinkingConfig: { thinkingBudget: 0 }
+          systemInstruction: "Generate follow-up pediatric questions.",
       }
     });
     
@@ -139,12 +128,12 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Provide a health summary for ${profile.name} based on: ${JSON.stringify(logs.slice(0, 5))}. No markdown.`;
+    const prompt = `Summarize infant health logs for ${profile.name}. NO MARKDOWN. Logs: ${JSON.stringify(logs.slice(0, 3))}`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
-      config: { systemInstruction: "Brief pediatric health agent." }
+      config: { systemInstruction: "Brief health status agent." }
     });
     return response.text || "";
   } catch {
@@ -155,15 +144,18 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
 export const generateFormalReport = async (logs: LogEntry[], profile: InfantProfile, chatHistory: string): Promise<string> => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Create a formal medical report for ${profile.name} using logs: ${JSON.stringify(logs.slice(0, 20))}. Structure with headers but NO markdown symbols.`;
+        const prompt = `Formal medical report for ${profile.name}. Retrieve guidelines via Search to verify classifications. Logs: ${JSON.stringify(logs.slice(0, 15))}. No markdown.`;
         
         const response = await ai.models.generateContent({
-          model: 'gemini-flash-lite-latest',
+          model: 'gemini-3-flash-preview',
           contents: prompt,
-          config: { systemInstruction: "Professional clinical reporting agent." }
+          config: { 
+            systemInstruction: "Professional clinical reporting assistant.",
+            tools: [{ googleSearch: {} }]
+          }
         });
-        return response.text || "Report generation failed.";
+        return response.text || "Clinical report generation failed.";
       } catch {
-        return "Error creating clinical report.";
+        return "Error creating clinical record.";
       }
 };
