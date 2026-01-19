@@ -1,7 +1,8 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { LogEntry, InfantProfile, Nutrients } from "../types";
+import { LogEntry, InfantProfile, Nutrients, AgeGroup } from "../types";
 import { DOC_TITLES_FOR_SEARCH } from "./documents";
+import { calculateRDAContribution, checkChokingHazards, generateSafetyScore, estimateVolumeDensity } from "./nutritionAlgorithms";
 
 const getSystemInstruction = (profile: InfantProfile) => {
   return `You are "NurtureAI Medical Agent," a specialized pediatric clinical assistant.
@@ -99,9 +100,12 @@ ACTION:
 export const analyzeMealImage = async (base64Image: string, profile: InfantProfile): Promise<Nutrients | null> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Analyze this image of a meal intended for a ${profile.ageGroup} infant (approx ${profile.weight}kg). 
-    Identify the food items and estimate the nutritional content.
-    Provide the result in JSON format only.`;
+    const prompt = `Act as a Pediatric Nutritionist. Analyze this image for a ${profile.ageGroup} infant (Weight: ${profile.weight}kg).
+    1. Identify ingredients.
+    2. Assess texture (Puree, Soft Solid, Hard Solid, Chunky).
+    3. Estimate volume in ml.
+    4. Provide basic macro nutrients.
+    Provide the result in JSON format.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -116,18 +120,36 @@ export const analyzeMealImage = async (base64Image: string, profile: InfantProfi
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            calories: { type: Type.NUMBER, description: "Estimated total calories" },
-            protein: { type: Type.NUMBER, description: "Estimated protein in grams" },
-            carbs: { type: Type.NUMBER, description: "Estimated carbohydrates in grams" },
-            fat: { type: Type.NUMBER, description: "Estimated fat in grams" },
-            mainIngredients: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Key ingredients identified" }
+            calories: { type: Type.NUMBER },
+            protein: { type: Type.NUMBER },
+            carbs: { type: Type.NUMBER },
+            fat: { type: Type.NUMBER },
+            mainIngredients: { type: Type.ARRAY, items: { type: Type.STRING } },
+            textureAssessment: { type: Type.STRING, enum: ['Puree', 'Soft Solid', 'Hard Solid', 'Chunky'] },
+            volumeEstimateMl: { type: Type.NUMBER }
           },
-          required: ["calories", "protein", "carbs", "fat", "mainIngredients"]
+          required: ["calories", "protein", "carbs", "fat", "mainIngredients", "textureAssessment"]
         }
       }
     });
 
-    return JSON.parse(response.text || "null");
+    const aiData = JSON.parse(response.text || "{}");
+    if (!aiData.calories) return null;
+
+    // RUN REAL-WORLD ALGORITHMS ON AI OUTPUT
+    const isHazard = checkChokingHazards(aiData.mainIngredients, profile.ageGroup as AgeGroup);
+    const safetyScore = generateSafetyScore(isHazard, aiData.textureAssessment, profile.ageGroup as AgeGroup);
+    const rda = calculateRDAContribution(aiData.calories, profile.weight);
+    const volume = aiData.volumeEstimateMl || estimateVolumeDensity(aiData.mainIngredients);
+
+    return {
+      ...aiData,
+      chokingHazardDetected: isHazard,
+      safetyScore: safetyScore,
+      rdaContribution: rda,
+      volumeEstimateMl: volume
+    };
+
   } catch (error) {
     console.error("Meal analysis error:", error);
     return null;
@@ -165,7 +187,7 @@ export const generateDynamicSuggestions = async (history: string, logs: LogEntry
 export const generateDailySummary = async (logs: LogEntry[], profile: InfantProfile): Promise<string> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Summarize infant health logs for ${profile.name}. NO MARKDOWN. Logs: ${JSON.stringify(logs.slice(0, 3))}`;
+    const prompt = `Summarize infant health logs for ${profile.name}. NO MARKDOWN. Recent Logs: ${JSON.stringify(logs.slice(0, 10))}`;
     
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -174,7 +196,7 @@ export const generateDailySummary = async (logs: LogEntry[], profile: InfantProf
     });
     return response.text || "";
   } catch {
-    return "";
+    return "Status summary currently unavailable.";
   }
 };
 

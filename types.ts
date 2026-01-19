@@ -40,6 +40,11 @@ export interface Nutrients {
   fiber?: number;
   sugar?: number;
   mainIngredients: string[];
+  volumeEstimateMl?: number;
+  safetyScore: number; // 0 to 100
+  chokingHazardDetected: boolean;
+  rdaContribution: number; // % of daily needs
+  textureAssessment: 'Puree' | 'Soft Solid' | 'Hard Solid' | 'Chunky';
 }
 
 export interface LogEntry {
