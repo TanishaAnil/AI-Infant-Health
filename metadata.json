@@ -2,6 +2,7 @@
   "name": "NurtureAI - Agentic Infant Monitor",
   "description": "An intelligent, agentic health monitoring interface for infants that tracks vitals, sleep, and feeding, providing real-time AI insights and pediatric guidance.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }

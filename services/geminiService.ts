@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { LogEntry, InfantProfile } from "../types";
+import { LogEntry, InfantProfile, Nutrients } from "../types";
 import { DOC_TITLES_FOR_SEARCH } from "./documents";
 
 const getSystemInstruction = (profile: InfantProfile) => {
@@ -78,7 +78,6 @@ ACTION:
     
     const text = response.text || "I am currently unable to access the clinical data.";
     
-    // Extract sources from grounding metadata for true RAG transparency
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
       .filter(Boolean) || [];
@@ -94,6 +93,44 @@ ACTION:
         : "Clinical retrieval service interrupted. Please try again.", 
       sources: [] 
     };
+  }
+};
+
+export const analyzeMealImage = async (base64Image: string, profile: InfantProfile): Promise<Nutrients | null> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = `Analyze this image of a meal intended for a ${profile.ageGroup} infant (approx ${profile.weight}kg). 
+    Identify the food items and estimate the nutritional content.
+    Provide the result in JSON format only.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          { inlineData: { data: base64Image.split(',')[1], mimeType: 'image/jpeg' } },
+          { text: prompt }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            calories: { type: Type.NUMBER, description: "Estimated total calories" },
+            protein: { type: Type.NUMBER, description: "Estimated protein in grams" },
+            carbs: { type: Type.NUMBER, description: "Estimated carbohydrates in grams" },
+            fat: { type: Type.NUMBER, description: "Estimated fat in grams" },
+            mainIngredients: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Key ingredients identified" }
+          },
+          required: ["calories", "protein", "carbs", "fat", "mainIngredients"]
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "null");
+  } catch (error) {
+    console.error("Meal analysis error:", error);
+    return null;
   }
 };
 

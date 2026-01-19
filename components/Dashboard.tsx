@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { LogEntry, LogType, InfantProfile } from '../types';
-import { Baby, Utensils, Heart, Activity, Waves, Moon, Droplets, Thermometer, AlertCircle, CheckCircle2, ChevronRight, Clock } from 'lucide-react';
+import { Baby, Utensils, Heart, Activity, Waves, Moon, Droplets, Thermometer, AlertCircle, CheckCircle2, ChevronRight, Clock, Camera } from 'lucide-react';
 import { t } from '../utils/translations';
 
 interface DashboardProps {
@@ -56,6 +56,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog,
         <p className="text-slate-400 text-xs mt-2 font-bold uppercase tracking-widest flex items-center gap-2">
           <Clock size={12} /> Today's monitoring status
         </p>
+      </div>
+
+      {/* Meal Scan Promo */}
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-5 rounded-[32px] shadow-lg border border-white/5 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-4 text-white/5 group-hover:scale-110 transition-transform">
+            <Camera size={100} />
+        </div>
+        <div className="relative z-10 flex items-center justify-between">
+            <div className="max-w-[70%]">
+                <h4 className="text-white font-black text-sm uppercase tracking-widest mb-1">AI Meal Scan</h4>
+                <p className="text-slate-400 text-[10px] leading-relaxed">Capture meal photos to automatically track calories and nutrients.</p>
+            </div>
+            <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/10">
+                <Utensils size={20} />
+            </div>
+        </div>
       </div>
 
       {/* Baby ID Card */}

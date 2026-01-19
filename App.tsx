@@ -8,8 +8,9 @@ import { HealthCharts } from './components/HealthCharts';
 import { ReportView } from './components/ReportView';
 import { ProfileSettings } from './components/ProfileSettings';
 import { LogModal } from './components/LogModal';
+import { MealScanner } from './components/MealScanner';
 import { ViewState, LogEntry, InfantProfile, LogType, ChatMessage, SeverityLevel } from './types';
-import { LayoutDashboard, Activity, MessageCircle, FileText, PlusCircle, AlertTriangle, VolumeX, User, Phone } from 'lucide-react';
+import { LayoutDashboard, Activity, MessageCircle, FileText, PlusCircle, AlertTriangle, VolumeX, User, Phone, Camera } from 'lucide-react';
 import { generateDailySummary } from './services/geminiService';
 import { t } from './utils/translations';
 
@@ -200,20 +201,27 @@ const App: React.FC = () => {
           {view === 'profile' && (
             <ProfileSettings profile={profile!} onUpdate={(u) => setProfile(u)} onLogout={() => setView('landing')} />
           )}
+
+          {view === 'scanner' && (
+            <MealScanner profile={profile!} onSave={saveLog} onClose={() => setView('dashboard')} />
+          )}
         </main>
 
         <div className="shrink-0 bg-white border-t border-slate-100 p-3 z-20 shadow-[0_-15px_30px_rgba(0,0,0,0.04)]">
           <div className="grid grid-cols-5 gap-1 relative items-center">
             <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={20} />} label="Home" />
-            <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={<Activity size={20} />} label="Trends" />
+            <NavButton active={view === 'analysis'} onClick={() => setView('analysis'} icon={<Activity size={20} />} label="Trends" />
             
             <div className="relative -top-8 flex justify-center pointer-events-none">
-              <button 
-                onClick={() => handleQuickLog(LogType.SYMPTOM)} 
-                className="pointer-events-auto w-16 h-16 bg-indigo-600 rounded-[24px] shadow-2xl flex items-center justify-center text-white active:scale-90 transition-all border-4 border-white hover:bg-indigo-700"
-              >
-                <PlusCircle size={32} />
-              </button>
+              <div className="flex flex-col items-center">
+                <button 
+                  onClick={() => setView('scanner')} 
+                  className="pointer-events-auto w-16 h-16 bg-gradient-to-tr from-indigo-600 to-indigo-700 rounded-[24px] shadow-2xl flex items-center justify-center text-white active:scale-90 transition-all border-4 border-white hover:bg-indigo-800"
+                >
+                  <Camera size={30} />
+                </button>
+                <span className="text-[8px] font-black text-indigo-600 uppercase mt-2">AI Scan</span>
+              </div>
             </div>
 
             <NavButton active={view === 'logs'} onClick={() => setView('logs')} icon={<MessageCircle size={20} />} label="AI Doctor" />

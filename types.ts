@@ -8,7 +8,8 @@ export enum LogType {
   SYMPTOM = 'SYMPTOM',
   HEART_RATE = 'HEART_RATE',
   SPO2 = 'SPO2',
-  BLOOD_GLUCOSE = 'BLOOD_GLUCOSE'
+  BLOOD_GLUCOSE = 'BLOOD_GLUCOSE',
+  MEAL_ANALYSIS = 'MEAL_ANALYSIS'
 }
 
 export enum SeverityLevel {
@@ -31,6 +32,16 @@ export enum AgeGroup {
 
 export type Language = 'en' | 'te';
 
+export interface Nutrients {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  sugar?: number;
+  mainIngredients: string[];
+}
+
 export interface LogEntry {
   id: string;
   type: LogType;
@@ -47,6 +58,8 @@ export interface LogEntry {
     symptom?: string;
     note?: string;
     severity?: SeverityLevel;
+    nutrients?: Nutrients;
+    imageUrl?: string;
   };
 }
 
@@ -70,4 +83,4 @@ export interface InfantProfile {
   language: Language;
 }
 
-export type ViewState = 'landing' | 'auth' | 'dashboard' | 'logs' | 'analysis' | 'report' | 'profile';
+export type ViewState = 'landing' | 'auth' | 'dashboard' | 'logs' | 'analysis' | 'report' | 'profile' | 'scanner';
