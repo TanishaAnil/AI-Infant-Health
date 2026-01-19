@@ -210,7 +210,7 @@ const App: React.FC = () => {
         <div className="shrink-0 bg-white border-t border-slate-100 p-3 z-20 shadow-[0_-15px_30px_rgba(0,0,0,0.04)]">
           <div className="grid grid-cols-5 gap-1 relative items-center">
             <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={20} />} label="Home" />
-            <NavButton active={view === 'analysis'} onClick={() => setView('analysis'} icon={<Activity size={20} />} label="Trends" />
+            <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={<Activity size={20} />} label="Trends" />
             
             <div className="relative -top-8 flex justify-center pointer-events-none">
               <div className="flex flex-col items-center">
