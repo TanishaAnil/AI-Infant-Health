@@ -30,7 +30,7 @@ const App: React.FC = () => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmIntervalRef = useRef<number | null>(null);
 
-  // MQTT Real-time Integration
+  // MQTT Real-time Integration for MLX90614 IR Sensor
   useEffect(() => {
     if (profile?.mqttConfig?.enabled && view === 'dashboard') {
       const client = connectMqtt(
@@ -38,16 +38,24 @@ const App: React.FC = () => {
         (topic, message) => {
           const temp = parseFloat(message);
           if (!isNaN(temp)) {
+            // We prioritize the "object" temperature as the baby's actual body temperature
+            // The provided ESP32 code uses: iot/ikram/mlx90614/object
+            const isObjectTemp = topic.includes('object');
+            
             const newLog: LogEntry = {
-              id: `mqtt_${Date.now()}`,
+              id: `mqtt_${Date.now()}_${isObjectTemp ? 'obj' : 'amb'}`,
               type: LogType.TEMPERATURE,
               timestamp: new Date(),
               details: {
                 temperature: temp,
-                note: "Real-time IR Sensor Input"
+                note: isObjectTemp ? "Baby Skin Temperature (IR)" : "Ambient Room Temperature"
               }
             };
-            setLogs(prev => [newLog, ...prev.slice(0, 49)]); // Keep last 50
+
+            // Only update the main view if it's the object (body) temperature
+            if (isObjectTemp) {
+              setLogs(prev => [newLog, ...prev.slice(0, 49)]);
+            }
           }
         },
         (status) => setMqttStatus(status)
@@ -195,7 +203,7 @@ const App: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${mqttStatus === 'connected' ? 'bg-emerald-500 animate-pulse-live' : 'bg-slate-400'}`}></div>
                     <span className="text-[10px] font-black uppercase tracking-widest">
-                      {mqttStatus === 'connected' ? 'Live Sensor: Streaming' : 'Sensor: Offline'}
+                      {mqttStatus === 'connected' ? 'MLX90614 Sensor: Active' : 'IR Sensor: Offline'}
                     </span>
                   </div>
                   <span className="text-[8px] font-bold opacity-50">{profile.mqttConfig.topic}</span>

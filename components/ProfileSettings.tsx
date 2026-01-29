@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { InfantProfile, Gender, AgeGroup, MqttConfig } from '../types';
-import { User, Calendar, Ruler, Weight, Save, LogOut, Radio, Globe, Hash } from 'lucide-react';
+import { User, Calendar, Ruler, Weight, Save, LogOut, Radio, Globe, Hash, Info } from 'lucide-react';
 
 interface ProfileSettingsProps {
   profile: InfantProfile;
@@ -34,7 +34,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onUpd
     setFormData({
       ...formData,
       mqttConfig: {
-        ...(formData.mqttConfig || { brokerUrl: 'wss://broker.hivemq.com:8000/mqtt', topic: 'nurtureai/temp', enabled: false }),
+        ...(formData.mqttConfig || { brokerUrl: 'wss://broker.hivemq.com:8000/mqtt', topic: 'iot/ikram/mlx90614/object', enabled: false }),
         ...updates
       }
     });
@@ -68,7 +68,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onUpd
            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                  <Radio size={18} className="text-indigo-600" />
-                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">IR Sensor Config</h3>
+                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">IR Sensor Config (MLX90614)</h3>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input 
@@ -82,6 +82,13 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onUpd
            </div>
            
            <div className={`space-y-4 transition-all ${formData.mqttConfig?.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 flex gap-2">
+                  <Info size={16} className="text-amber-600 shrink-0" />
+                  <p className="text-[9px] text-amber-800 font-bold leading-tight">
+                    MQTT over WebSockets is required for browsers. Ensure your broker (e.g. Mosquitto) has WebSockets enabled on port 8000/9001. Use wss:// for secure sites.
+                  </p>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1">MQTT Broker (WebSocket URL)</label>
                 <div className="relative">
@@ -91,12 +98,12 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onUpd
                     value={formData.mqttConfig?.brokerUrl} 
                     onChange={e => updateMqtt({ brokerUrl: e.target.value })}
                     className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-[10px]" 
-                    placeholder="wss://broker.hivemq.com:8000/mqtt"
+                    placeholder="ws://10.32.0.148:9001"
                   />
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Sensor Topic</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Object Temp Topic</label>
                 <div className="relative">
                   <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                   <input 
@@ -104,7 +111,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onUpd
                     value={formData.mqttConfig?.topic} 
                     onChange={e => updateMqtt({ topic: e.target.value })}
                     className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-[10px]" 
-                    placeholder="nurtureai/temp/infant1"
+                    placeholder="iot/ikram/mlx90614/object"
                   />
                 </div>
               </div>
