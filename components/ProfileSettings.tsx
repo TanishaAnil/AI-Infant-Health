@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { InfantProfile, Gender, AgeGroup } from '../types';
-import { User, Calendar, Ruler, Weight, Save, LogOut } from 'lucide-react';
+import { InfantProfile, Gender, AgeGroup, MqttConfig } from '../types';
+import { User, Calendar, Ruler, Weight, Save, LogOut, Radio, Globe, Hash } from 'lucide-react';
 
 interface ProfileSettingsProps {
   profile: InfantProfile;
@@ -30,6 +30,16 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onUpd
     alert("Profile Updated Successfully!");
   };
 
+  const updateMqtt = (updates: Partial<MqttConfig>) => {
+    setFormData({
+      ...formData,
+      mqttConfig: {
+        ...(formData.mqttConfig || { brokerUrl: 'wss://broker.hivemq.com:8000/mqtt', topic: 'nurtureai/temp', enabled: false }),
+        ...updates
+      }
+    });
+  };
+
   return (
     <div className="p-4 space-y-6 animate-fade-in pb-20">
       <div className="flex items-center justify-between px-2">
@@ -51,6 +61,54 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ profile, onUpd
               className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" 
             />
           </div>
+        </div>
+
+        {/* Real-time MQTT Config Section */}
+        <div className="pt-4 border-t border-slate-100">
+           <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                 <Radio size={18} className="text-indigo-600" />
+                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">IR Sensor Config</h3>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={formData.mqttConfig?.enabled} 
+                  onChange={(e) => updateMqtt({ enabled: e.target.checked })}
+                  className="sr-only peer" 
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+           </div>
+           
+           <div className={`space-y-4 transition-all ${formData.mqttConfig?.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">MQTT Broker (WebSocket URL)</label>
+                <div className="relative">
+                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <input 
+                    type="text" 
+                    value={formData.mqttConfig?.brokerUrl} 
+                    onChange={e => updateMqtt({ brokerUrl: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-[10px]" 
+                    placeholder="wss://broker.hivemq.com:8000/mqtt"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Sensor Topic</label>
+                <div className="relative">
+                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <input 
+                    type="text" 
+                    value={formData.mqttConfig?.topic} 
+                    onChange={e => updateMqtt({ topic: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-[10px]" 
+                    placeholder="nurtureai/temp/infant1"
+                  />
+                </div>
+              </div>
+           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

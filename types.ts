@@ -76,6 +76,12 @@ export interface ChatMessage {
   isThinking?: boolean;
 }
 
+export interface MqttConfig {
+  brokerUrl: string;
+  topic: string;
+  enabled: boolean;
+}
+
 export interface InfantProfile {
   name: string;
   parentName: string;
@@ -86,6 +92,7 @@ export interface InfantProfile {
   gender: Gender;
   ageGroup?: AgeGroup;
   language: Language;
+  mqttConfig?: MqttConfig;
 }
 
 export type ViewState = 'landing' | 'auth' | 'dashboard' | 'logs' | 'analysis' | 'report' | 'profile' | 'scanner';

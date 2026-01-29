@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { LogEntry, LogType, InfantProfile } from '../types';
-import { Baby, Utensils, Heart, Activity, Waves, Moon, Droplets, Thermometer, AlertCircle, CheckCircle2, ChevronRight, Clock, Camera } from 'lucide-react';
+import { Baby, Utensils, Heart, Activity, Waves, Moon, Droplets, Thermometer, AlertCircle, CheckCircle2, ChevronRight, Clock, Camera, Radio } from 'lucide-react';
 import { t } from '../utils/translations';
 
 interface DashboardProps {
@@ -32,17 +32,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog,
       lastHr, 
       lastSpo2, 
       lastSleep,
-      tempStatus: lastTemp?.details.temperature && (lastTemp.details.temperature > 37.5 || lastTemp.details.temperature < 36) ? 'warning' : 'normal',
+      tempStatus: lastTemp?.details.temperature && (lastTemp.details.temperature > 37.8 || lastTemp.details.temperature < 36) ? 'warning' : 'normal',
       hrStatus: lastHr?.details.bpm && (lastHr.details.bpm > 160 || lastHr.details.bpm < 100) ? 'warning' : 'normal',
       oxyStatus: lastSpo2?.details.oxygen && lastSpo2.details.oxygen < 95 ? 'warning' : 'normal',
+      isLiveTemp: lastTemp?.id.startsWith('mqtt_')
     };
   }, [logs]);
 
   const getTimeAgo = (date?: Date) => {
     if (!date) return '--';
     const diff = Math.floor((new Date().getTime() - date.getTime()) / 60000);
-    if (diff < 60) return `${diff}m`;
-    return `${Math.floor(diff / 60)}h ${diff % 60}m`;
+    if (diff < 1) return 'Just now';
+    if (diff < 60) return `${diff}m ago`;
+    return `${Math.floor(diff / 60)}h ${diff % 60}m ago`;
   };
 
   return (
@@ -56,22 +58,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog,
         <p className="text-slate-400 text-xs mt-2 font-bold uppercase tracking-widest flex items-center gap-2">
           <Clock size={12} /> Today's monitoring status
         </p>
-      </div>
-
-      {/* Meal Scan Promo */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-5 rounded-[32px] shadow-lg border border-white/5 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-4 text-white/5 group-hover:scale-110 transition-transform">
-            <Camera size={100} />
-        </div>
-        <div className="relative z-10 flex items-center justify-between">
-            <div className="max-w-[70%]">
-                <h4 className="text-white font-black text-sm uppercase tracking-widest mb-1">AI Meal Scan</h4>
-                <p className="text-slate-400 text-[10px] leading-relaxed">Capture meal photos to automatically track calories and nutrients.</p>
-            </div>
-            <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/10">
-                <Utensils size={20} />
-            </div>
-        </div>
       </div>
 
       {/* Baby ID Card */}
@@ -96,6 +82,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog,
       </div>
 
       <div className="grid grid-cols-2 gap-4">
+        {/* Real-time Temperature Card */}
+        <div className={`p-5 rounded-[32px] border shadow-sm transition-all relative overflow-hidden ${stats.tempStatus === 'warning' ? 'bg-orange-50 border-orange-100' : 'bg-white border-slate-100'}`}>
+            {stats.isLiveTemp && (
+              <div className="absolute top-0 right-0 p-3">
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500 rounded-full">
+                  <span className="w-1 h-1 bg-white rounded-full animate-pulse-live"></span>
+                  <span className="text-[7px] font-black text-white uppercase tracking-tighter">Live Sensor</span>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center justify-between mb-3">
+                <div className={`p-2 rounded-xl ${stats.tempStatus === 'warning' ? 'bg-orange-100 text-orange-600' : 'bg-orange-50 text-orange-600'}`}>
+                  <Thermometer size={20} className={stats.isLiveTemp ? 'animate-pulse' : ''} />
+                </div>
+                {stats.tempStatus === 'warning' ? <AlertCircle size={14} className="text-orange-500" /> : <CheckCircle2 size={14} className="text-emerald-400" />}
+            </div>
+            <p className={`text-3xl font-black text-slate-900 leading-none transition-all ${stats.isLiveTemp ? 'scale-105' : ''}`}>
+              {stats.lastTemp?.details.temperature ? `${stats.lastTemp.details.temperature.toFixed(1)}°C` : '--'}
+            </p>
+            <div className="flex justify-between items-center mt-3">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">{t('temperature', lang)}</span>
+                <span className="text-[10px] font-bold text-slate-300">{getTimeAgo(stats.lastTemp?.timestamp)}</span>
+            </div>
+        </div>
+
         {/* Heart Rate Card */}
         <div className={`p-5 rounded-[32px] border shadow-sm transition-all ${stats.hrStatus === 'warning' ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-100'}`}>
             <div className="flex items-center justify-between mb-3">
@@ -123,21 +134,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ logs, profile, onQuickLog,
             <div className="flex justify-between items-center mt-3">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">{t('spo2', lang)}</span>
                 <span className="text-[10px] font-bold text-slate-300">{getTimeAgo(stats.lastSpo2?.timestamp)}</span>
-            </div>
-        </div>
-
-        {/* Temperature Card */}
-        <div className={`p-5 rounded-[32px] border shadow-sm transition-all ${stats.tempStatus === 'warning' ? 'bg-orange-50 border-orange-100' : 'bg-white border-slate-100'}`}>
-            <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-orange-50 text-orange-600 rounded-xl">
-                  <Thermometer size={20} />
-                </div>
-                {stats.tempStatus === 'warning' ? <AlertCircle size={14} className="text-orange-500" /> : <CheckCircle2 size={14} className="text-emerald-400" />}
-            </div>
-            <p className="text-3xl font-black text-slate-900 leading-none">{stats.lastTemp?.details.temperature ? `${stats.lastTemp.details.temperature}°C` : '--'}</p>
-            <div className="flex justify-between items-center mt-3">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">{t('temperature', lang)}</span>
-                <span className="text-[10px] font-bold text-slate-300">{getTimeAgo(stats.lastTemp?.timestamp)}</span>
             </div>
         </div>
 

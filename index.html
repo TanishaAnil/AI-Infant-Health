@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -29,6 +30,14 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
+      @keyframes pulse-live {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.2); opacity: 0.7; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .animate-pulse-live {
+        animation: pulse-live 1.5s infinite;
+      }
     </style>
   <script type="importmap">
 {
@@ -40,6 +49,7 @@
     "recharts": "https://esm.sh/recharts@^3.6.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "mqtt": "https://esm.sh/mqtt@^5.10.1",
     "vite": "https://esm.sh/vite@^7.3.0"
   }
 }

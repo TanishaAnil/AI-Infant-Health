@@ -12,6 +12,7 @@ import { MealScanner } from './components/MealScanner';
 import { ViewState, LogEntry, InfantProfile, LogType, ChatMessage, SeverityLevel } from './types';
 import { LayoutDashboard, Activity, MessageCircle, FileText, PlusCircle, AlertTriangle, VolumeX, User, Phone, Camera } from 'lucide-react';
 import { generateDailySummary } from './services/geminiService';
+import { connectMqtt, disconnectMqtt } from './services/mqttService';
 import { t } from './utils/translations';
 
 const App: React.FC = () => {
@@ -24,9 +25,36 @@ const App: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [severity, setSeverity] = useState<SeverityLevel>(SeverityLevel.STABLE);
   const [isAlarmActive, setIsAlarmActive] = useState(false);
+  const [mqttStatus, setMqttStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmIntervalRef = useRef<number | null>(null);
+
+  // MQTT Real-time Integration
+  useEffect(() => {
+    if (profile?.mqttConfig?.enabled && view === 'dashboard') {
+      const client = connectMqtt(
+        profile.mqttConfig,
+        (topic, message) => {
+          const temp = parseFloat(message);
+          if (!isNaN(temp)) {
+            const newLog: LogEntry = {
+              id: `mqtt_${Date.now()}`,
+              type: LogType.TEMPERATURE,
+              timestamp: new Date(),
+              details: {
+                temperature: temp,
+                note: "Real-time IR Sensor Input"
+              }
+            };
+            setLogs(prev => [newLog, ...prev.slice(0, 49)]); // Keep last 50
+          }
+        },
+        (status) => setMqttStatus(status)
+      );
+      return () => disconnectMqtt();
+    }
+  }, [profile?.mqttConfig, view]);
 
   const stopAlarmSound = () => {
     if (alarmIntervalRef.current) {
@@ -162,6 +190,18 @@ const App: React.FC = () => {
         <main className="flex-1 overflow-hidden relative flex flex-col bg-slate-50/50">
           {view === 'dashboard' && (
             <div className="flex-1 overflow-y-auto p-4">
+               {profile?.mqttConfig?.enabled && (
+                <div className={`mb-4 px-4 py-2 rounded-full flex items-center justify-between border shadow-sm transition-all ${mqttStatus === 'connected' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${mqttStatus === 'connected' ? 'bg-emerald-500 animate-pulse-live' : 'bg-slate-400'}`}></div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">
+                      {mqttStatus === 'connected' ? 'Live Sensor: Streaming' : 'Sensor: Offline'}
+                    </span>
+                  </div>
+                  <span className="text-[8px] font-bold opacity-50">{profile.mqttConfig.topic}</span>
+                </div>
+              )}
+
               {dailyDigest && (
                 <div className="mb-6 bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 rounded-[32px] text-white shadow-xl animate-fade-in border border-white/10 relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 opacity-10"><Activity size={80} /></div>
